@@ -148,7 +148,7 @@ New code is MPL-2.0. See [NOTICE.md](NOTICE.md), [UPSTREAM_LOCK.md](UPSTREAM_LOC
 
 ## Notes
 
-I vibe coded this in GPT Sol 5.6. Use at your own risk. Actual programmers are welcome to submit PR's and feedback.
+I vibe coded this in GPT Sol 5.6. Use at your own risk. Actual programmers are welcome to submit PR's and feedback. I made this on a lark. Might make the Rust Cultists happy.
 
 ## About Dominic Bytes
 

@@ -1,0 +1,35 @@
+{
+  "binaries": {
+    "debug": {
+      "architectures": [
+        "arm64",
+        "x86_64"
+      ],
+      "dependencies": [
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "required_export": "gdext_rust_init",
+      "sha256": "E188B808B9677EA823EA1257E9C0D5448F10F475705DC733DD325430DC1AC393",
+      "size": 113957944,
+      "status": "PASS"
+    },
+    "release": {
+      "architectures": [
+        "arm64",
+        "x86_64"
+      ],
+      "dependencies": [
+        "/usr/lib/libSystem.B.dylib"
+      ],
+      "required_export": "gdext_rust_init",
+      "sha256": "035E54DEEEB219B8C2063C4624EFD23B9F60A8CF974266560976F7690360A40E",
+      "size": 34393984,
+      "status": "PASS"
+    }
+  },
+  "image": "ghcr.io/rust-cross/cargo-zigbuild@sha256:b8364c2c60cdcc9b95c402d17654bff517410926a35678bd89dd924b8158d6ae",
+  "rust": "1.94.0",
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "universal2-apple-darwin"
+}

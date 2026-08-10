@@ -1,0 +1,21 @@
+{
+  "redot_header": {
+    "version_major": 26,
+    "version_minor": 2,
+    "version_patch": 0,
+    "version_status": "stable",
+    "version_status_version": 0,
+    "version_build": "official",
+    "version_full_name": "Redot Engine LTS v26.2.stable.official",
+    "precision": "single"
+  },
+  "header": {
+    "version_major": 4,
+    "version_minor": 5,
+    "version_patch": 2,
+    "version_status": "stable",
+    "version_build": "redot.official",
+    "version_full_name": "Godot Engine v4.5.2.stable.redot.official",
+    "precision": "single"
+  }
+}

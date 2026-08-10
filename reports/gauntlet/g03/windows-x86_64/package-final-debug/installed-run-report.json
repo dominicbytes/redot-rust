@@ -1,0 +1,55 @@
+{
+  "command": [
+    "<REDOT_EDITOR>",
+    "--headless",
+    "--path",
+    "<PROJECT_ROOT>",
+    "--quit-after",
+    "120",
+    "--",
+    "--redot-rust-result=<RESULT>"
+  ],
+  "failures": [],
+  "findings": [],
+  "initialization": {
+    "command": [
+      "<REDOT_EDITOR>",
+      "--headless",
+      "--editor",
+      "--path",
+      "<PROJECT_ROOT>",
+      "--quit-after",
+      "120"
+    ],
+    "findings": [],
+    "markers": {
+      "REDOT_RUST_EDITOR_TOOL status=PASS": true,
+      "REDOT_RUST_INIT stage=Core": true,
+      "REDOT_RUST_INIT stage=Editor": true,
+      "REDOT_RUST_INIT stage=MainLoop": true,
+      "REDOT_RUST_INIT stage=Scene": true,
+      "REDOT_RUST_INIT stage=Servers": true
+    },
+    "returncode": 0,
+    "timed_out": false
+  },
+  "result": {
+    "assertions": {
+      "build_profile": true,
+      "class_visible": true,
+      "identity": true,
+      "instance": true,
+      "lifecycle": true,
+      "method": true,
+      "signal": true
+    },
+    "failures": [],
+    "frames": 2,
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "windows-x86_64",
+  "timed_out": false
+}

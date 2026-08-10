@@ -1,0 +1,37 @@
+Initialize godot-rust (API v4.5.2.stable.redot.official, runtime v4.5.2.stable.redot.official, safeguards strict)
+REDOT_RUST_INIT stage=Core
+Redot Engine LTS v26.2.stable.official.4f5b14aba (2026-06-29 19:32:24 UTC) - https://redotengine.org
+REDOT_RUST_INIT stage=Servers
+
+REDOT_RUST_INIT stage=Scene
+REDOT_RUST_INIT stage=Editor
+REDOT_RUST_EDITOR_TOOL status=PASS
+REDOT_RUST_INIT stage=MainLoop
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1msavepack[22m | Started Packing (102 steps)[39m[0m
+[   1% ] [90m[1msavepack[22m | Storing File: res://bin/manifest.json[39m[0m
+[  21% ] [90m[1msavepack[22m | Storing File: res://bin/profile-selection.json[39m[0m
+[  40% ] [90m[1msavepack[22m | Storing File: res://bin/redot_rust_smoke.gdextension[39m[0m
+[  60% ] [90m[1msavepack[22m | Storing File: res://main.gdc[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://.godot/exported/133200997/export-3070c538c03ee49b7677ff960a3f5195-main.scn[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://main.gd.remap[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://main.tscn.remap[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://.godot/global_script_class_cache.cfg[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://.godot/uid_cache.bin[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://.godot/extension_list.cfg[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://project.binary[39m[0m
+[92m[ DONE ][39m [1msavepack[22m
+[0m
+REDOT_RUST_DEINIT stage=MainLoop
+REDOT_RUST_DEINIT stage=Editor
+REDOT_RUST_DEINIT stage=Scene
+REDOT_RUST_DEINIT stage=Servers
+REDOT_RUST_DEINIT stage=Core

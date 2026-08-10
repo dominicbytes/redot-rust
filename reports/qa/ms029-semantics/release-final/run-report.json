@@ -1,0 +1,76 @@
+{
+  "command": [
+    "<REDOT_EDITOR>",
+    "--headless",
+    "--path",
+    "<PROJECT_ROOT>",
+    "--quit-after",
+    "240"
+  ],
+  "failures": [],
+  "findings": [],
+  "initialization": {
+    "command": [
+      "<REDOT_EDITOR>",
+      "--headless",
+      "--editor",
+      "--path",
+      "<PROJECT_ROOT>",
+      "--quit-after",
+      "120"
+    ],
+    "findings": [],
+    "markers": {
+      "REDOT_RUST_EDITOR_TOOL status=PASS": true,
+      "REDOT_RUST_INIT stage=Core": true,
+      "REDOT_RUST_INIT stage=Editor": true,
+      "REDOT_RUST_INIT stage=MainLoop": true,
+      "REDOT_RUST_INIT stage=Scene": true,
+      "REDOT_RUST_INIT stage=Servers": true
+    },
+    "returncode": 0,
+    "timed_out": false
+  },
+  "markers": {
+    "REDOT_RUST_INIT stage=Core": true,
+    "REDOT_RUST_INIT stage=MainLoop": true,
+    "REDOT_RUST_INIT stage=Scene": true,
+    "REDOT_RUST_INIT stage=Servers": true,
+    "REDOT_RUST_RESULT status=PASS": true,
+    "REDOT_RUST_SMOKE lifecycle=ready": true
+  },
+  "result": {
+    "assertions": {
+      "array": true,
+      "build_profile": true,
+      "class_visible": true,
+      "dictionary": true,
+      "editor_tool": true,
+      "enum": true,
+      "identity": true,
+      "init_stages": true,
+      "lifecycle_ready": true,
+      "method": true,
+      "property": true,
+      "resource_apply": true,
+      "resource_class_visible": true,
+      "resource_inspector": true,
+      "resource_round_trip": true,
+      "rust_to_gdscript_callable": true,
+      "signal": true,
+      "tool_class_visible": true,
+      "variant": true,
+      "worker_handoff": true,
+      "worker_started": true
+    },
+    "failures": [],
+    "frames": 4,
+    "godot_api": "4.5.2",
+    "library_profile": "release",
+    "redot_product": "26.2",
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "status": "PASS",
+  "timed_out": false
+}

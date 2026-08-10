@@ -1,0 +1,31 @@
+{
+	"assertions": {
+		"array": true,
+		"build_profile": true,
+		"class_visible": true,
+		"dictionary": true,
+		"editor_tool": true,
+		"enum": true,
+		"identity": true,
+		"init_stages": true,
+		"lifecycle_ready": true,
+		"method": true,
+		"property": true,
+		"resource_apply": true,
+		"resource_class_visible": true,
+		"resource_inspector": true,
+		"resource_round_trip": true,
+		"rust_to_gdscript_callable": true,
+		"signal": true,
+		"tool_class_visible": true,
+		"variant": true,
+		"worker_handoff": true,
+		"worker_started": true
+	},
+	"failures": [],
+	"frames": 2,
+	"godot_api": "4.5.2",
+	"library_profile": "debug",
+	"redot_product": "26.2",
+	"status": "PASS"
+}

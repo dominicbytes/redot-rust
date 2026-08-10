@@ -1,0 +1,40 @@
+{
+  "date": "2026-08-10",
+  "tasks": ["P6-T03", "P6-T04", "P6-T05"],
+  "status": "PASS",
+  "unit_tests": {
+    "command": "python -m unittest discover -s tests -p test_*.py -v",
+    "passed": 15,
+    "failed": 0
+  },
+  "real_dump": {
+    "configured_binary_role": "console launcher",
+    "invoked_binary_role": "sibling actual editor",
+    "api_dump_exit": 0,
+    "interface_dump_exit": 0,
+    "api_sha256": "177E7796166929B2193C9CCE2FD32F59601A0147D0D1E7FE904B94E8F69F6577",
+    "interface_header_sha256": "4CD695E86B92E2BF4E60BBE19CE137FAF41205DA1CF94F29E069AFEC0F7BF320"
+  },
+  "identity": {
+    "redot_product": "26.2.0",
+    "godot_api": "4.5.2",
+    "precision": "single",
+    "expected_cfgs": ["since_api=4.5", "before_api=4.6"]
+  },
+  "negative_cases": [
+    "missing standard header",
+    "API major 26",
+    "wrong API minor",
+    "unsupported API minor",
+    "precision mismatch",
+    "build metadata mismatch",
+    "stale API hash",
+    "Redot header mismatch",
+    "console launcher with no sibling editor",
+    "stale inherited gdext environment"
+  ],
+  "interface_json": {
+    "status": "UNAVAILABLE",
+    "reason": "The installed Redot 26.2 help and dump commands expose the C interface header, not gdextension_interface.json. Bundled-interface mode remains the supported path."
+  }
+}

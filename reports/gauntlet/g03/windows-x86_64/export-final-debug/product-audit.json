@@ -1,0 +1,55 @@
+{
+  "binary_audit": {
+    "architectures": [
+      "x86_64"
+    ],
+    "binary": "redot_rust_smoke.windows.template_debug.x86_64.dll",
+    "debug_runtime_dependencies": [],
+    "dependencies": [
+      "api-ms-win-core-synch-l1-2-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "bcryptprimitives.dll",
+      "KERNEL32.dll",
+      "ntdll.dll",
+      "VCRUNTIME140.dll"
+    ],
+    "export_count": 1,
+    "exports": [
+      "gdext_rust_init"
+    ],
+    "failures": [],
+    "format": "PE32+",
+    "inspection_method": "pe-tables",
+    "other_export_count": 0,
+    "required_export": "gdext_rust_init",
+    "schema_version": 1,
+    "sha256": "953A206255432FA93284FFB5EEA38BAC86D60B35D934E601977DA7EB7CA8E18C",
+    "size": 3796992,
+    "status": "PASS"
+  },
+  "expected_library": {
+    "file": "redot_rust_smoke.windows.template_debug.x86_64.dll",
+    "sha256": "953A206255432FA93284FFB5EEA38BAC86D60B35D934E601977DA7EB7CA8E18C",
+    "size": 3796992
+  },
+  "failures": [],
+  "library": {
+    "archive_path": "redot_rust_smoke.windows.template_debug.x86_64.dll",
+    "sha256": "953A206255432FA93284FFB5EEA38BAC86D60B35D934E601977DA7EB7CA8E18C",
+    "size": 3796992
+  },
+  "native_candidates": [
+    "redot_rust_smoke.windows.template_debug.x86_64.dll"
+  ],
+  "product": {
+    "file": "redot-rust-smoke-windows-x86_64-debug.exe",
+    "sha256": "224395723D1644A842AD3B69F6E1F3F98C21F39F49611FB29D27F43A05294AF5",
+    "size": 95282144
+  },
+  "profile": "debug",
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "windows-x86_64"
+}

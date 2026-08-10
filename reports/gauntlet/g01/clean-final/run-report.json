@@ -1,0 +1,42 @@
+{
+  "command": [
+    "<REDOT_EDITOR>",
+    "--headless",
+    "--path",
+    "<PROJECT_ROOT>",
+    "--quit-after",
+    "120"
+  ],
+  "failures": [],
+  "findings": [],
+  "initialization": {
+    "command": [
+      "<REDOT_EDITOR>",
+      "--headless",
+      "--editor",
+      "--path",
+      "<PROJECT_ROOT>",
+      "--quit-after",
+      "120"
+    ],
+    "findings": [],
+    "returncode": 0,
+    "timed_out": false
+  },
+  "result": {
+    "assertions": {
+      "class_visible": true,
+      "identity": true,
+      "method": true,
+      "property": true,
+      "signal": true
+    },
+    "frames": 2,
+    "godot_api": "4.5.2",
+    "redot_product": "26.2",
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "status": "PASS",
+  "timed_out": false
+}

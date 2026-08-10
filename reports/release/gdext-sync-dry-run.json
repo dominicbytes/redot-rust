@@ -1,0 +1,27 @@
+{
+  "applied": false,
+  "candidate_contract": {
+    "api_custom_json_feature": true,
+    "cargo_lock": false,
+    "license_file": true,
+    "revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+    "source_clean": true,
+    "standard_header_loader": true
+  },
+  "candidate_revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+  "current_revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+  "dry_run": true,
+  "failures": [],
+  "impact": {
+    "api": "none",
+    "consumer": "none",
+    "dependencies": "none",
+    "license": "none",
+    "patches": "none"
+  },
+  "patch_files": [],
+  "required_follow_up": [],
+  "revision_changed": false,
+  "schema_version": 1,
+  "status": "PASS"
+}

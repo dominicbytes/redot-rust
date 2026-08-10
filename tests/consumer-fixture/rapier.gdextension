@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "rapier_2d_init"
+compatibility_minimum = 4.5
+reloadable = false
+
+[libraries]
+
+windows.debug.x86_64 = "res://bin/godot_rapier.dll"
+windows.release.x86_64 = "res://bin/godot_rapier.dll"

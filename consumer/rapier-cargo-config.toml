@@ -1,0 +1,6 @@
+# Shared by the read-only Rapier v0.8.40 consumer probe. This replaces only
+# the crates.io facade package; its workspace dependencies resolve from the
+# same pinned gdext source revision.
+
+[patch.crates-io]
+godot = { git = "https://github.com/godot-rust/gdext", rev = "637cef73172bba23850131acd8583b0c72ebf0c7" }

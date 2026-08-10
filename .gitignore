@@ -1,0 +1,16 @@
+/target/
+/build/
+/dist/
+/fixtures/redot-project/.godot/
+/fixtures/redot-project/bin/*.dll
+/fixtures/redot-project/bin/*.dylib
+/fixtures/redot-project/bin/*.so
+/fixtures/redot-project/bin/manifest.json
+/fixtures/redot-project/.results/
+/fixtures/redot-project/export_presets.cfg
+*.exp
+*.lib
+*.pdb
+__pycache__/
+*.py[cod]
+.pytest_cache/

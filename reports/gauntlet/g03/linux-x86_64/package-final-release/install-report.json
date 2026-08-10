@@ -1,0 +1,35 @@
+{
+  "extension_list": "res://addons/redot-rust-compat/redot_rust_smoke.gdextension",
+  "installation": {
+    "installed_files": [
+      "addons/redot-rust-compat/LICENSE",
+      "addons/redot-rust-compat/NOTICE.md",
+      "addons/redot-rust-compat/README.md",
+      "addons/redot-rust-compat/UPSTREAM_LOCK.md",
+      "addons/redot-rust-compat/bin/libredot_rust_smoke.linux.template_debug.x86_64.so",
+      "addons/redot-rust-compat/bin/libredot_rust_smoke.linux.template_release.x86_64.so",
+      "addons/redot-rust-compat/docs/compatibility.md",
+      "addons/redot-rust-compat/docs/limitations.md",
+      "addons/redot-rust-compat/package-manifest.json",
+      "addons/redot-rust-compat/redot-api.lock.json",
+      "addons/redot-rust-compat/redot_rust_smoke.gdextension"
+    ],
+    "package": "redot-rust-compat-0.1.0_redot.26.2.1-linux-x86_64.zip",
+    "schema_version": 1,
+    "status": "PASS",
+    "target": "linux-x86_64",
+    "version": "0.1.0+redot.26.2.1"
+  },
+  "profile": "release",
+  "profile_mapping_override": {
+    "library": "libredot_rust_smoke.linux.template_release.x86_64.so",
+    "rewritten_keys": [
+      "linux.debug.x86_64",
+      "linux.release.x86_64"
+    ]
+  },
+  "schema_version": 1,
+  "source_file_count": 3,
+  "status": "PASS",
+  "target": "linux-x86_64"
+}

@@ -1,0 +1,9 @@
+# Copy only when an environment-based adapter cannot be used.
+# Paths are relative to this `.cargo` directory; do not replace them with
+# machine-specific absolute paths in tracked files.
+
+[env]
+GDRUST_GODOT_API_JSON = { value = "../../api/redot-26.2/4f5b14aba-single-windows-x86_64/extension_api.json", relative = true }
+
+# The installed Redot 26.2 build does not expose interface JSON generation.
+# Leave GDRUST_GODOT_INTERFACE_JSON unset so pinned gdext uses its bundled data.

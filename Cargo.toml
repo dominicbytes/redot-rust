@@ -1,0 +1,12 @@
+[workspace]
+members = ["examples/smoke-extension"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+godot = { git = "https://github.com/godot-rust/gdext", rev = "637cef73172bba23850131acd8583b0c72ebf0c7", features = ["api-custom-json"] }

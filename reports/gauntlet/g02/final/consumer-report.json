@@ -1,0 +1,115 @@
+{
+  "binaries": {
+    "debug": {
+      "has_2d_entry": true,
+      "has_3d_entry": false,
+      "rapier_entry_symbols": [
+        "rapier_2d_init"
+      ],
+      "sha256": "731864804233120F535D521E30B9CE13C80CC21750C84BCFC417E37F8579AEB1",
+      "size": 8305664
+    },
+    "release": {
+      "has_2d_entry": true,
+      "has_3d_entry": false,
+      "rapier_entry_symbols": [
+        "rapier_2d_init"
+      ],
+      "sha256": "BE2B56992AA8B4A5A0BFCB530EA8733C3474B7C5FC64439BA4997AA543B4E1E3",
+      "size": 6377984
+    }
+  },
+  "consumer": {
+    "cargo_features": [
+      "single-dim2",
+      "godot/api-custom-json"
+    ],
+    "commit": "de3458c23426fe332e491013c4412fe1fb84e778",
+    "final_crate_cfg": [
+      "feature=\"api-4-5\""
+    ],
+    "package_version": "0.8.40",
+    "repository": "https://github.com/appsinacup/godot-rapier-physics.git",
+    "tag": "v0.8.40"
+  },
+  "failures": [],
+  "gdext": {
+    "crate_version": "0.5.5",
+    "packages": {
+      "godot": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-bindings": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-cell": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-codegen": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-core": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-ffi": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      },
+      "godot-macros": {
+        "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+        "version": "0.5.5"
+      }
+    },
+    "revision": "637cef73172bba23850131acd8583b0c72ebf0c7"
+  },
+  "runtimes": {
+    "debug": {
+      "active_server_class": "RapierPhysicsServer2D",
+      "allowed_findings": [
+        {
+          "line": "WARNING: godot-rust: TypedSignal connections are now auto-disconnected.",
+          "line_number": 19,
+          "severity": "warning"
+        }
+      ],
+      "assertions_passed": 9,
+      "assertions_total": 9,
+      "body_position_y": 100.129470825195,
+      "failures": [],
+      "frames": 90,
+      "peak_active_objects": 1,
+      "status": "PASS"
+    },
+    "release": {
+      "active_server_class": "RapierPhysicsServer2D",
+      "allowed_findings": [
+        {
+          "line": "WARNING: godot-rust: TypedSignal connections are now auto-disconnected.",
+          "line_number": 19,
+          "severity": "warning"
+        }
+      ],
+      "assertions_passed": 9,
+      "assertions_total": 9,
+      "body_position_y": 100.129470825195,
+      "failures": [],
+      "frames": 90,
+      "peak_active_objects": 1,
+      "status": "PASS"
+    }
+  },
+  "schema_version": 1,
+  "source_boundary": {
+    "clean_after": true,
+    "clean_before": true,
+    "generated_payload_matches": true,
+    "payload_file_count": 93,
+    "payload_sha256": "8EA58861CD588EDB3B05484F224109FB8F6C7CF62BE5C8CAC56D9A3DB8AB8A46"
+  },
+  "status": "PASS"
+}

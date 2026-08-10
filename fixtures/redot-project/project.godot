@@ -1,0 +1,26 @@
+; Engine configuration file.
+; Managed by the Redot–Rust compatibility smoke fixture.
+
+config_version=5
+
+[application]
+
+config/name="Redot Rust Compatibility Smoke"
+run/main_scene="res://main.tscn"
+
+[compatibility]
+
+expected_library_profile="debug"
+
+[display]
+
+window/size/viewport_width=320
+window/size/viewport_height=180
+window/size/window_width_override=320
+window/size/window_height_override=180
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.5.2.stable.redot.official, runtime v4.5.2.stable.redot.official, safeguards strict)
+Redot Engine LTS v26.2.stable.official.4f5b14aba (2026-06-29 19:32:24 UTC) - https://redotengine.org
+
+REDOT_RUST_SMOKE lifecycle=ready
+REDOT_RUST_RESULT status=PASS frames=2

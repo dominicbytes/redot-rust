@@ -1,0 +1,94 @@
+{
+  "failures": [],
+  "initialization": {
+    "command": [
+      "<REDOT_EDITOR>",
+      "--headless",
+      "--editor",
+      "--path",
+      "<PROJECT_ROOT>",
+      "--quit-after",
+      "120"
+    ],
+    "findings": [],
+    "markers": {
+      "REDOT_RUST_EDITOR_TOOL status=PASS": true,
+      "REDOT_RUST_INIT stage=Core": true,
+      "REDOT_RUST_INIT stage=Editor": true,
+      "REDOT_RUST_INIT stage=MainLoop": true,
+      "REDOT_RUST_INIT stage=Scene": true,
+      "REDOT_RUST_INIT stage=Servers": true
+    },
+    "returncode": 0,
+    "timed_out": false
+  },
+  "runtime": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "<MOUNTS>",
+      "rust:1.94-bookworm",
+      "<REDOT_TEMPLATE>",
+      "--headless",
+      "--path",
+      "/fixture",
+      "--quit-after",
+      "120"
+    ],
+    "findings": [],
+    "markers": {
+      "REDOT_RUST_INIT stage=Core": true,
+      "REDOT_RUST_INIT stage=MainLoop": true,
+      "REDOT_RUST_INIT stage=Scene": true,
+      "REDOT_RUST_INIT stage=Servers": true,
+      "REDOT_RUST_RESULT status=PASS": true,
+      "REDOT_RUST_SMOKE lifecycle=ready": true
+    },
+    "result": {
+      "assertions": {
+        "array": true,
+        "build_profile": true,
+        "class_visible": true,
+        "dictionary": true,
+        "editor_tool": true,
+        "enum": true,
+        "identity": true,
+        "init_stages": true,
+        "lifecycle_ready": true,
+        "method": true,
+        "property": true,
+        "resource_apply": true,
+        "resource_class_visible": true,
+        "resource_inspector": true,
+        "resource_round_trip": true,
+        "rust_to_gdscript_callable": true,
+        "signal": true,
+        "tool_class_visible": true,
+        "variant": true,
+        "worker_handoff": true,
+        "worker_started": true
+      },
+      "failures": [],
+      "frames": 2,
+      "godot_api": "4.5.2",
+      "library_profile": "debug",
+      "redot_product": "26.2",
+      "status": "PASS"
+    },
+    "returncode": 0,
+    "timed_out": false
+  },
+  "selection": {
+    "docker_image": "rust:1.94-bookworm",
+    "library": "libredot_rust_smoke.linux.template_debug.x86_64.so",
+    "library_sha256": "BB18D994A6EC81E6B1BBFED1467CBA7FB0F9EBC0AD166D96F077EC0E8494C26F",
+    "library_size": 93497608,
+    "profile": "debug",
+    "schema_version": 1,
+    "template": "linux_debug.x86_64",
+    "template_sha256": "B94EFFE58CB906290ED2E2BA5E7CC106391AE4440560E53515614479F826A4A9",
+    "template_size": 70521080
+  },
+  "status": "PASS"
+}

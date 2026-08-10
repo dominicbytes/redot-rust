@@ -1,0 +1,29 @@
+{
+  "allowed_findings": [],
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "<MOUNTS>",
+    "rust:1.94-bookworm",
+    "<REDOT_EDITOR_EXPORT>"
+  ],
+  "failures": [],
+  "findings": [],
+  "product": {
+    "file": "redot-rust-smoke-linux-x86_64-debug",
+    "sha256": "63B716F4E46B1258BC9721A001ED775255D61DDA3E868439ED7C7661EA44A00F",
+    "size": 70530448
+  },
+  "profile": "debug",
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "linux-x86_64",
+  "template": {
+    "file": "linux_debug.x86_64",
+    "sha256": "B94EFFE58CB906290ED2E2BA5E7CC106391AE4440560E53515614479F826A4A9",
+    "size": 70521080
+  },
+  "timed_out": false
+}

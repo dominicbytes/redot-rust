@@ -1,0 +1,28 @@
+{
+  "architectures": [
+    "x86_64"
+  ],
+  "binary": "redot_rust_smoke.windows.template_release.x86_64.dll",
+  "debug_runtime_dependencies": [],
+  "dependencies": [
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "api-ms-win-crt-heap-l1-1-0.dll",
+    "api-ms-win-crt-runtime-l1-1-0.dll",
+    "api-ms-win-crt-string-l1-1-0.dll",
+    "bcryptprimitives.dll",
+    "KERNEL32.dll",
+    "ntdll.dll",
+    "VCRUNTIME140.dll"
+  ],
+  "exports": [
+    "gdext_rust_init"
+  ],
+  "failures": [],
+  "format": "PE32+",
+  "inspection_method": "pe-tables",
+  "required_export": "gdext_rust_init",
+  "schema_version": 1,
+  "sha256": "DD193645005EA4449C1C5EF7C18F35D5677AE072820080BCB1BC78318865A0D9",
+  "size": 4012544,
+  "status": "PASS"
+}

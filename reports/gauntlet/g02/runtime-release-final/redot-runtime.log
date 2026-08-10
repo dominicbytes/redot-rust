@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.5.2.stable.redot.official, runtime v4.5.2.stable.redot.official, safeguards balanced)
+Redot Engine LTS v26.2.stable.official.4f5b14aba (2026-06-29 19:32:24 UTC) - https://redotengine.org
+
+[92mPHYSICS ENGINE 2D: Rapier2D v0.8.40[39m[0m
+REDOT_RAPIER_CONSUMER lifecycle=ready
+REDOT_RAPIER_CONSUMER status=PASS assertions=9/9 server=RapierPhysicsServer2D body_y=100.129

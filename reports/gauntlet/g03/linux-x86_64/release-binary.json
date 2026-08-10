@@ -1,0 +1,24 @@
+{
+  "architectures": [
+    "x86_64"
+  ],
+  "binary": "libredot_rust_smoke.linux.template_release.x86_64.so",
+  "debug_runtime_dependencies": [],
+  "dependencies": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1"
+  ],
+  "exports": [
+    "__cxa_thread_atexit_impl",
+    "gdext_rust_init"
+  ],
+  "failures": [],
+  "format": "ELF64",
+  "inspection_method": "elf-tables",
+  "required_export": "gdext_rust_init",
+  "schema_version": 1,
+  "sha256": "131154F6DE8CB3516AA547A1FECBB644803E162007F259F6991F8F38C5C4BF91",
+  "size": 4902776,
+  "status": "PASS"
+}

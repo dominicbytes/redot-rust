@@ -1,0 +1,94 @@
+ Downloading crates ...
+  Downloaded regex v1.13.1
+  Downloaded memchr v2.8.3
+  Downloaded aho-corasick v1.1.5
+  Downloaded regex-syntax v0.8.11
+  Downloaded regex-automata v0.4.18
+   Compiling regex-syntax v0.8.11
+   Compiling godot-bindings v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)
+   Compiling gdextension-api v0.5.1 (https://github.com/godot-rust/godot4-prebuilt?branch=release-v0.5#3a0f8c3d)
+   Compiling which v8.0.5
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling nanoserde-derive v0.2.1
+   Compiling heck v0.5.0
+    Checking godot-cell v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)
+    Checking glam v0.32.1
+   Compiling nanoserde v0.2.1
+   Compiling venial v0.6.1
+   Compiling regex-automata v0.4.18
+   Compiling regex v1.13.1
+   Compiling godot-codegen v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)
+   Compiling godot-macros v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)
+error: failed to run custom build command for `godot-codegen v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)`
+
+Caused by:
+  process didn't exit successfully: `<TARGET_DIR>\debug\build\godot-codegen-6099a8a3e17d2b0b\build-script-build` (exit code: 101)
+  --- stdout
+  cargo:rustc-check-cfg=cfg(published_docs, values(none()))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.2"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.2"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.3"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.3"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.4"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.4"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.5"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.5"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.6"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.6"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.7"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.7"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.8"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.8"))
+  cargo:rerun-if-env-changed=GDRUST_GODOT_BIN
+  cargo:rerun-if-env-changed=GODOT4_BIN
+  Found GDRUST_GODOT_BIN with path to executable: '<REDOT_EDITOR>'
+  [stdout] 26.2.stable.official.4f5b14aba
+
+  [stderr]
+  [status] exit code: 0
+
+  --- stderr
+
+  thread 'main' (11288) panicked at <USER_HOME>\.cargo\git\checkouts\gdext-067f4b88e7bd088f\637cef7\godot-bindings\src\lib.rs:46:9:
+  assertion `left == right` failed: Only Godot major version 4 is supported; found version 26.2.stable.official.4f5b14aba.
+    left: 26
+   right: 4
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...
+error: failed to run custom build command for `godot-macros v0.5.5 (https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73)`
+
+Caused by:
+  process didn't exit successfully: `<TARGET_DIR>\debug\build\godot-macros-a61c5cc733859cfe\build-script-build` (exit code: 101)
+  --- stdout
+  cargo:rustc-check-cfg=cfg(published_docs, values(none()))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.2"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.2"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.3"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.3"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.4"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.4"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.5"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.5"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.6"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.6"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.7"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.7"))
+  cargo:rustc-check-cfg=cfg(since_api, values("4.8"))
+  cargo:rustc-check-cfg=cfg(before_api, values("4.8"))
+  cargo:rerun-if-env-changed=GDRUST_GODOT_BIN
+  cargo:rerun-if-env-changed=GODOT4_BIN
+  Found GDRUST_GODOT_BIN with path to executable: '<REDOT_EDITOR>'
+  [stdout] 26.2.stable.official.4f5b14aba
+
+  [stderr]
+  [status] exit code: 0
+
+  --- stderr
+
+  thread 'main' (105388) panicked at <USER_HOME>\.cargo\git\checkouts\gdext-067f4b88e7bd088f\637cef7\godot-bindings\src\lib.rs:46:9:
+  assertion `left == right` failed: Only Godot major version 4 is supported; found version 26.2.stable.official.4f5b14aba.
+    left: 26
+   right: 4
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

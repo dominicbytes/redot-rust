@@ -1,0 +1,1 @@
+"""Redot–Rust compatibility tooling."""

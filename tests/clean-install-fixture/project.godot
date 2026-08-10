@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Clean package-install fixture for redot-rust-compat.
+
+config_version=5
+
+[application]
+
+config/name="Redot Rust Compatibility Clean Install"
+run/main_scene="res://main.tscn"
+
+[compatibility]
+
+expected_library_profile="debug"
+
+[display]
+
+window/size/viewport_width=320
+window/size/viewport_height=180
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

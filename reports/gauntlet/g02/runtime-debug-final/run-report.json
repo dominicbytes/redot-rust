@@ -1,0 +1,69 @@
+{
+  "allowed_findings": [],
+  "command": [
+    "<REDOT_EDITOR>",
+    "--headless",
+    "--path",
+    "<PROJECT_ROOT>",
+    "--fixed-fps",
+    "60",
+    "--quit-after",
+    "180"
+  ],
+  "failures": [],
+  "findings": [],
+  "initialization": {
+    "allowed_findings": [
+      {
+        "line": "WARNING: godot-rust: TypedSignal connections are now auto-disconnected.",
+        "line_number": 19,
+        "severity": "warning"
+      }
+    ],
+    "command": [
+      "<REDOT_EDITOR>",
+      "--headless",
+      "--editor",
+      "--path",
+      "<PROJECT_ROOT>",
+      "--quit-after",
+      "120"
+    ],
+    "engine_marker": true,
+    "findings": [],
+    "returncode": 0,
+    "timed_out": false
+  },
+  "markers": {
+    "PHYSICS ENGINE 2D: Rapier2D v0.8.40": true,
+    "REDOT_RAPIER_CONSUMER status=PASS": true
+  },
+  "result": {
+    "active_objects": 0,
+    "active_server_class": "RapierPhysicsServer2D",
+    "assertions": {
+      "active_server_is_rapier": true,
+      "body_rid_valid": true,
+      "body_uses_active_space": true,
+      "factory_class_registered": true,
+      "project_selects_rapier": true,
+      "rigid_body_fell": true,
+      "rigid_body_resting_on_floor": true,
+      "server_class_registered": true,
+      "server_reported_active_objects": true
+    },
+    "body_position_y": 100.129470825195,
+    "frames": 90,
+    "peak_active_objects": 1,
+    "schema_version": 1,
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "selection": {
+    "library_sha256": "731864804233120F535D521E30B9CE13C80CC21750C84BCFC417E37F8579AEB1",
+    "library_size": 8305664,
+    "schema_version": 1
+  },
+  "status": "PASS",
+  "timed_out": false
+}

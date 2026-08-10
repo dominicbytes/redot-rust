@@ -1,0 +1,18 @@
+; Engine configuration file.
+; Generated and validated against the locally installed Redot build.
+
+config_version=5
+
+[application]
+
+config/name="Redot Rust Rapier Consumer"
+run/main_scene="res://main.tscn"
+
+[physics]
+
+2d/physics_engine="Rapier2D"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

@@ -1,0 +1,30 @@
+{
+  "allowed_findings": [],
+  "command": [
+    "<REDOT_EDITOR>",
+    "--headless",
+    "--path",
+    "<PROJECT_ROOT>",
+    "--export-release",
+    "Redot Rust Compat",
+    "<OUTPUT>/redot-rust-smoke-windows-x86_64-release.exe"
+  ],
+  "failures": [],
+  "findings": [],
+  "product": {
+    "file": "redot-rust-smoke-windows-x86_64-release.exe",
+    "sha256": "B11F8D9A02E3F2D06A910ACEB687CDF96C65E3FEC17C7AC40E4BEB28ECA8EEED",
+    "size": 97447000
+  },
+  "profile": "release",
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "windows-x86_64",
+  "template": {
+    "file": "windows_release_x86_64.exe",
+    "sha256": "723097CE13CC7C28202CE67337F167D15482EA57147BE33EA1C5D7818A45B137",
+    "size": 97499136
+  },
+  "timed_out": false
+}

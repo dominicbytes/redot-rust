@@ -1,0 +1,14 @@
+{
+	"assertions": {
+		"build_profile": true,
+		"class_visible": true,
+		"identity": true,
+		"instance": true,
+		"lifecycle": true,
+		"method": true,
+		"signal": true
+	},
+	"failures": [],
+	"frames": 2,
+	"status": "PASS"
+}

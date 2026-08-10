@@ -1,0 +1,35 @@
+{
+  "extension_list": "res://addons/redot-rust-compat/redot_rust_smoke.gdextension",
+  "installation": {
+    "installed_files": [
+      "addons/redot-rust-compat/LICENSE",
+      "addons/redot-rust-compat/NOTICE.md",
+      "addons/redot-rust-compat/README.md",
+      "addons/redot-rust-compat/UPSTREAM_LOCK.md",
+      "addons/redot-rust-compat/bin/redot_rust_smoke.windows.template_debug.x86_64.dll",
+      "addons/redot-rust-compat/bin/redot_rust_smoke.windows.template_release.x86_64.dll",
+      "addons/redot-rust-compat/docs/compatibility.md",
+      "addons/redot-rust-compat/docs/limitations.md",
+      "addons/redot-rust-compat/package-manifest.json",
+      "addons/redot-rust-compat/redot-api.lock.json",
+      "addons/redot-rust-compat/redot_rust_smoke.gdextension"
+    ],
+    "package": "redot-rust-compat-0.1.0_redot.26.2.1-windows-x86_64.zip",
+    "schema_version": 1,
+    "status": "PASS",
+    "target": "windows-x86_64",
+    "version": "0.1.0+redot.26.2.1"
+  },
+  "profile": "debug",
+  "profile_mapping_override": {
+    "library": "redot_rust_smoke.windows.template_debug.x86_64.dll",
+    "rewritten_keys": [
+      "windows.debug.x86_64",
+      "windows.release.x86_64"
+    ]
+  },
+  "schema_version": 1,
+  "source_file_count": 3,
+  "status": "PASS",
+  "target": "windows-x86_64"
+}

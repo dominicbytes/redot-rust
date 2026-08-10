@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "profile": "redot-26.2-4f5b14aba-single-windows-x86_64",
+  "generated_at": "2026-08-10T10:50:51-05:00",
+  "redot": {
+    "version_string": "26.2.stable.official.4f5b14aba",
+    "engine_commit": "4f5b14abade2239104847d03d8f9056e4467cfcd",
+    "version_major": 26,
+    "version_minor": 2,
+    "version_patch": 0,
+    "version_status": "stable",
+    "version_build": "official",
+    "version_full_name": "Redot Engine LTS v26.2.stable.official",
+    "precision": "single"
+  },
+  "godot_api": {
+    "version_major": 4,
+    "version_minor": 5,
+    "version_patch": 2,
+    "version_status": "stable",
+    "version_build": "redot.official",
+    "version_full_name": "Godot Engine v4.5.2.stable.redot.official",
+    "precision": "single",
+    "supported_minor_min": 2,
+    "supported_minor_max": 7
+  },
+  "target": {
+    "platform": "windows",
+    "architecture": "x86_64",
+    "precision": "single",
+    "build": "editor"
+  },
+  "files": {
+    "extension_api": {
+      "path": "../api/redot-26.2/4f5b14aba-single-windows-x86_64/extension_api.json",
+      "sha256": "177E7796166929B2193C9CCE2FD32F59601A0147D0D1E7FE904B94E8F69F6577"
+    },
+    "gdextension_interface_header": {
+      "path": "../api/redot-26.2/4f5b14aba-single-windows-x86_64/gdextension_interface.h",
+      "sha256": "4CD695E86B92E2BF4E60BBE19CE137FAF41205DA1CF94F29E069AFEC0F7BF320"
+    },
+    "gdextension_interface_json": {
+      "available": false,
+      "reason": "Redot 26.2 exposes --dump-gdextension-interface, which produces the C header; it does not expose --dump-gdextension-interface-json. Use the pinned gdext bundled interface JSON for API 4.5.2."
+    }
+  },
+  "binaries": {
+    "editor": {
+      "path": "../../.tools/redot/26.2-stable-windows/redot.windows.editor.x86_64.exe",
+      "sha256": "10DFBEFC273536F0C65903D6429E531C30133820BF0FA842F2D6E6FB81DB1D42",
+      "pe_machine": "8664",
+      "pe_format": "PE32+"
+    },
+    "console_launcher": {
+      "path": "../../.tools/redot/26.2-stable-windows/redot.windows.editor.x86_64.console.exe",
+      "sha256": "5633D02A28A73514084DF6A60FFE01FABDBBB9AC5E28FDFD590ED47277F51989",
+      "dump_commands_supported": false
+    }
+  },
+  "gdext": {
+    "repository": "https://github.com/godot-rust/gdext",
+    "revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+    "crate_version": "0.5.5",
+    "feature": "api-custom-json",
+    "license": "MPL-2.0"
+  },
+  "rust": {
+    "toolchain": "1.94.0-x86_64-pc-windows-msvc",
+    "rustc_commit": "4a4ef493e3a1488c6e321570238084b38948f6db",
+    "cargo_version": "1.94.0",
+    "llvm_version": "21.1.8"
+  }
+}

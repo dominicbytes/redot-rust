@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/appsinacup/godot-rapier-physics.git",
+  "tag": "v0.8.40",
+  "commit": "de3458c23426fe332e491013c4412fe1fb84e778",
+  "package_version": "0.8.40",
+  "dimension": "2d",
+  "precision": "single",
+  "cargo_features": [
+    "single-dim2",
+    "godot/api-custom-json"
+  ],
+  "final_crate_cfg": [
+    "feature=\"api-4-5\""
+  ],
+  "dependency_config": "consumer/rapier-cargo-config.toml",
+  "redot_api_lock": "redot-api.lock.json",
+  "source_policy": "Read-only exact-tag source; only the generated Cargo.lock is updated externally."
+}

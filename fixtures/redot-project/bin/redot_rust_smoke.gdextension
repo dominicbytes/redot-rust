@@ -1,0 +1,14 @@
+[configuration]
+
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = "4.5"
+reloadable = false
+
+[libraries]
+
+windows.debug.x86_64 = "res://bin/redot_rust_smoke.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://bin/redot_rust_smoke.windows.template_release.x86_64.dll"
+linux.debug.x86_64 = "res://bin/libredot_rust_smoke.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://bin/libredot_rust_smoke.linux.template_release.x86_64.so"
+macos.debug = "res://bin/libredot_rust_smoke.macos.template_debug.universal.dylib"
+macos.release = "res://bin/libredot_rust_smoke.macos.template_release.universal.dylib"

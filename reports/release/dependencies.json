@@ -1,0 +1,132 @@
+{
+  "cargo": "1.94.0",
+  "gdext_revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+  "identity": {
+    "api_sha256": "177E7796166929B2193C9CCE2FD32F59601A0147D0D1E7FE904B94E8F69F6577",
+    "godot_api": "4.5.2",
+    "redot_product": "26.2.0"
+  },
+  "missing_licenses": [],
+  "package_count": 19,
+  "packages": [
+    {
+      "license": "MPL-2.0",
+      "name": "gdextension-api",
+      "source": "git+https://github.com/godot-rust/godot4-prebuilt?branch=release-v0.5#3a0f8c3db2157974b18e14acb1d082ea4b6dcf5c",
+      "version": "0.5.1"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "glam",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.32.1"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-bindings",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-cell",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-codegen",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-core",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-ffi",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "godot-macros",
+      "source": "git+https://github.com/godot-rust/gdext?rev=637cef73172bba23850131acd8583b0c72ebf0c7#637cef73172bba23850131acd8583b0c72ebf0c7",
+      "version": "0.5.5"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "heck",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.5.0"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "libc",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.189"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "nanoserde",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.1"
+    },
+    {
+      "license": "MIT",
+      "name": "nanoserde-derive",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.1"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "proc-macro2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.0.107"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "name": "quote",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.0.47"
+    },
+    {
+      "license": "MPL-2.0",
+      "name": "redot-rust-smoke",
+      "source": "workspace/path",
+      "version": "0.1.0"
+    },
+    {
+      "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "name": "unicode-ident",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.0.24"
+    },
+    {
+      "license": "MIT",
+      "name": "venial",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.6.1"
+    },
+    {
+      "license": "MIT",
+      "name": "which",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "8.0.5"
+    }
+  ],
+  "schema_version": 1,
+  "status": "PASS",
+  "workspace_members": [
+    "redot-rust-smoke 0.1.0"
+  ]
+}

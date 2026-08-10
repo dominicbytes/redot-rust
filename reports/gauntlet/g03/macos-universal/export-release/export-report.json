@@ -1,0 +1,29 @@
+{
+  "allowed_findings": [],
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "<MOUNTS>",
+    "rust:1.94-bookworm",
+    "<REDOT_EDITOR_EXPORT>"
+  ],
+  "failures": [],
+  "findings": [],
+  "product": {
+    "file": "redot-rust-smoke-macos-universal-release.zip",
+    "sha256": "1D19C93E293C58C91702464216734290E230F3140DCBA54F94D70D5D4421D36D",
+    "size": 69340296
+  },
+  "profile": "release",
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "macos-universal",
+  "template": {
+    "file": "macos.zip",
+    "sha256": "E41458D601C7129D984192FF025CB2D13B54D25835A78ADCEFFE2FD6B43E5ED4",
+    "size": 124818233
+  },
+  "timed_out": false
+}

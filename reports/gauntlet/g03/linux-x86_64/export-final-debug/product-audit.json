@@ -1,0 +1,50 @@
+{
+  "binary_audit": {
+    "architectures": [
+      "x86_64"
+    ],
+    "binary": "libredot_rust_smoke.linux.template_debug.x86_64.so",
+    "debug_runtime_dependencies": [],
+    "dependencies": [
+      "ld-linux-x86-64.so.2",
+      "libc.so.6",
+      "libgcc_s.so.1"
+    ],
+    "export_count": 2,
+    "exports": [
+      "gdext_rust_init"
+    ],
+    "failures": [],
+    "format": "ELF64",
+    "inspection_method": "elf-tables",
+    "other_export_count": 1,
+    "required_export": "gdext_rust_init",
+    "schema_version": 1,
+    "sha256": "BB18D994A6EC81E6B1BBFED1467CBA7FB0F9EBC0AD166D96F077EC0E8494C26F",
+    "size": 93497608,
+    "status": "PASS"
+  },
+  "expected_library": {
+    "file": "libredot_rust_smoke.linux.template_debug.x86_64.so",
+    "sha256": "BB18D994A6EC81E6B1BBFED1467CBA7FB0F9EBC0AD166D96F077EC0E8494C26F",
+    "size": 93497608
+  },
+  "failures": [],
+  "library": {
+    "archive_path": "libredot_rust_smoke.linux.template_debug.x86_64.so",
+    "sha256": "BB18D994A6EC81E6B1BBFED1467CBA7FB0F9EBC0AD166D96F077EC0E8494C26F",
+    "size": 93497608
+  },
+  "native_candidates": [
+    "libredot_rust_smoke.linux.template_debug.x86_64.so"
+  ],
+  "product": {
+    "file": "redot-rust-smoke-linux-x86_64-debug",
+    "sha256": "63B716F4E46B1258BC9721A001ED775255D61DDA3E868439ED7C7661EA44A00F",
+    "size": 70530448
+  },
+  "profile": "debug",
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "linux-x86_64"
+}

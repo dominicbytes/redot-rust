@@ -1,0 +1,39 @@
+{
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "<MOUNTS>",
+    "rust:1.94-bookworm",
+    "<EXPORTED_FIXTURE>"
+  ],
+  "failures": [],
+  "findings": [],
+  "markers": {
+    "REDOT_RUST_CLEAN_RESULT status=PASS": true,
+    "REDOT_RUST_INIT stage=Core": true,
+    "REDOT_RUST_INIT stage=MainLoop": true,
+    "REDOT_RUST_INIT stage=Scene": true,
+    "REDOT_RUST_INIT stage=Servers": true,
+    "REDOT_RUST_RESULT status=PASS": false
+  },
+  "result": {
+    "assertions": {
+      "build_profile": true,
+      "class_visible": true,
+      "identity": true,
+      "instance": true,
+      "lifecycle": true,
+      "method": true,
+      "signal": true
+    },
+    "failures": [],
+    "frames": 2,
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "linux-x86_64",
+  "timed_out": false
+}

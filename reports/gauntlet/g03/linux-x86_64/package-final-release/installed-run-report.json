@@ -1,0 +1,52 @@
+{
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "<MOUNTS>",
+    "rust:1.94-bookworm",
+    "<REDOT_TEMPLATE>"
+  ],
+  "failures": [],
+  "findings": [],
+  "initialization": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "<MOUNTS>",
+      "rust:1.94-bookworm",
+      "<REDOT_EDITOR_INITIALIZATION>"
+    ],
+    "findings": [],
+    "markers": {
+      "REDOT_RUST_EDITOR_TOOL status=PASS": true,
+      "REDOT_RUST_INIT stage=Core": true,
+      "REDOT_RUST_INIT stage=Editor": true,
+      "REDOT_RUST_INIT stage=MainLoop": true,
+      "REDOT_RUST_INIT stage=Scene": true,
+      "REDOT_RUST_INIT stage=Servers": true
+    },
+    "returncode": 0,
+    "timed_out": false
+  },
+  "result": {
+    "assertions": {
+      "build_profile": true,
+      "class_visible": true,
+      "identity": true,
+      "instance": true,
+      "lifecycle": true,
+      "method": true,
+      "signal": true
+    },
+    "failures": [],
+    "frames": 2,
+    "status": "PASS"
+  },
+  "returncode": 0,
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "linux-x86_64",
+  "timed_out": false
+}

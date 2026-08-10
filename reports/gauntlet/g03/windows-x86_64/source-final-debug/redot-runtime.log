@@ -1,0 +1,16 @@
+Initialize godot-rust (API v4.5.2.stable.redot.official, runtime v4.5.2.stable.redot.official, safeguards strict)
+REDOT_RUST_INIT stage=Core
+Redot Engine LTS v26.2.stable.official.4f5b14aba (2026-06-29 19:32:24 UTC) - https://redotengine.org
+REDOT_RUST_INIT stage=Servers
+
+REDOT_RUST_INIT stage=Scene
+REDOT_RUST_INIT stage=Editor
+REDOT_RUST_EDITOR_TOOL status=PASS
+REDOT_RUST_INIT stage=MainLoop
+REDOT_RUST_SMOKE lifecycle=ready
+REDOT_RUST_RESULT status=PASS frames=2
+REDOT_RUST_DEINIT stage=MainLoop
+REDOT_RUST_DEINIT stage=Editor
+REDOT_RUST_DEINIT stage=Scene
+REDOT_RUST_DEINIT stage=Servers
+REDOT_RUST_DEINIT stage=Core

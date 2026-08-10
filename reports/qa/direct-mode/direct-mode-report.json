@@ -1,0 +1,13 @@
+{
+  "disposition": "WAIVED",
+  "expected_failure": "Only Godot major version 4 is supported",
+  "expected_mode": "api-custom direct binary",
+  "failures": [],
+  "gdext_revision": "637cef73172bba23850131acd8583b0c72ebf0c7",
+  "redot_editor_sha256": "10DFBEFC273536F0C65903D6429E531C30133820BF0FA842F2D6E6FB81DB1D42",
+  "redot_version": "26.2.stable.official.4f5b14aba",
+  "returncode": 101,
+  "selected_mode": "api-custom-json",
+  "status": "PASS",
+  "timed_out": false
+}

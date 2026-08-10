@@ -1,0 +1,22 @@
+{
+  "completed_local_gates": [
+    "debug universal build and binary audit",
+    "release universal build and binary audit",
+    "fresh pinned-container build reproduction",
+    "debug unsigned app export and embedded-library audit",
+    "release unsigned app export and embedded-library audit",
+    "debug target archive safe installation",
+    "release target archive safe installation"
+  ],
+  "implemented_gate": ".github/workflows/ci.yml#macos-universal",
+  "reason": "Native macOS execution is impossible on the available Windows host and no public remote was authorized.",
+  "required_evidence": [
+    "debug source fixture runtime PASS",
+    "release source fixture runtime PASS",
+    "debug clean-installed fixture runtime PASS",
+    "release clean-installed fixture runtime PASS"
+  ],
+  "schema_version": 1,
+  "status": "NOT_RUN",
+  "target": "macos-universal"
+}

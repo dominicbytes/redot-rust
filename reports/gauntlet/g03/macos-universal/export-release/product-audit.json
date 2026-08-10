@@ -1,0 +1,49 @@
+{
+  "binary_audit": {
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "binary": "libredot_rust_smoke.macos.template_release.universal.dylib",
+    "debug_runtime_dependencies": [],
+    "dependencies": [
+      "/usr/lib/libSystem.B.dylib"
+    ],
+    "export_count": 41231,
+    "exports": [
+      "gdext_rust_init"
+    ],
+    "failures": [],
+    "format": "Mach-O universal",
+    "inspection_method": "macho-fat+load-commands+export-trie-or-symtab",
+    "other_export_count": 41230,
+    "required_export": "gdext_rust_init",
+    "schema_version": 1,
+    "sha256": "080CF09FC027795D16BCFE89060BCEDD250C06C13777D5691EE5AB1760A89C08",
+    "size": 34397952,
+    "status": "PASS"
+  },
+  "expected_library": {
+    "file": "libredot_rust_smoke.macos.template_release.universal.dylib",
+    "sha256": "080CF09FC027795D16BCFE89060BCEDD250C06C13777D5691EE5AB1760A89C08",
+    "size": 34397952
+  },
+  "failures": [],
+  "library": {
+    "archive_path": "Redot Rust Compatibility Smoke.app/Contents/Frameworks/libredot_rust_smoke.macos.template_release.universal.dylib",
+    "sha256": "080CF09FC027795D16BCFE89060BCEDD250C06C13777D5691EE5AB1760A89C08",
+    "size": 34397952
+  },
+  "native_candidates": [
+    "Redot Rust Compatibility Smoke.app/Contents/Frameworks/libredot_rust_smoke.macos.template_release.universal.dylib"
+  ],
+  "product": {
+    "file": "redot-rust-smoke-macos-universal-release.zip",
+    "sha256": "1D19C93E293C58C91702464216734290E230F3140DCBA54F94D70D5D4421D36D",
+    "size": 69340296
+  },
+  "profile": "release",
+  "schema_version": 1,
+  "status": "PASS",
+  "target": "macos-universal"
+}

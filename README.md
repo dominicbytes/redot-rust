@@ -145,3 +145,17 @@ The archive installs a test add-on under `addons/redot-rust-compat/`. It is evid
 `tools/sync_gdext.py` performs a read-only pin-update rehearsal and reports API, dependency, license, patch, and consumer impact. It never changes the lock automatically. Any future revision update must rerun the smoke, Rapier, desktop export, binary audit, and package gates.
 
 New code is MPL-2.0. See [NOTICE.md](NOTICE.md), [UPSTREAM_LOCK.md](UPSTREAM_LOCK.md), and the generated dependency report under `reports/release/`.
+
+## Notes
+
+I vibe coded this in GPT Sol 5.6. Use at your own risk. Actual programmers are welcome to submit PR's and feedback.
+
+## About Dominic Bytes
+
+Greetings! I am Dominic Bytes, the synth walker. I hail from the distant future. Where brains occupy robot bodies, time travel is a trip to the corner store, and the neon glow of our attire is powered by the light of our souls. Join me on a 1.21 gigawatt powered journey of chill vibes with gaming, anime, movies, and more!
+
+- [Website](https://dominicbytes.carrd.co/)
+- [X](https://x.com/DominicBytes)
+- [Twitch](https://www.twitch.tv/dominicbytes)
+- [YouTube](http://www.youtube.com/@DominicBytes)
+- [Kick](https://kick.com/dominicbytes)

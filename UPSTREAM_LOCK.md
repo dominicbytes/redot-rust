@@ -3,10 +3,8 @@
 | Field | Value |
 |---|---|
 | Project | Redot-Rust compatibility layer |
-| Original specification priority | 6 |
-| Current execution priority | 6 |
-| Authoritative host | Local repository; public host intentionally unset pending explicit publication authorization |
-| Repository URL | https://github.com/godot-rust/gdext |
+| Project repository | https://github.com/dominicbytes/redot-rust |
+| Upstream repository | https://github.com/godot-rust/gdext |
 | Selected branch | master |
 | Pinned upstream commit | `637cef73172bba23850131acd8583b0c72ebf0c7` |
 | Pinned crate version | `godot` 0.5.5 with `api-custom-json` |
@@ -20,7 +18,7 @@
 | `extension_api.json` SHA-256 | `177E7796166929B2193C9CCE2FD32F59601A0147D0D1E7FE904B94E8F69F6577` |
 | `gdextension_interface.h` SHA-256 | `4CD695E86B92E2BF4E60BBE19CE137FAF41205DA1CF94F29E069AFEC0F7BF320` |
 | Interface JSON | Not exposed by the installed Redot 26.2 build; pinned gdext bundled interface is the supported path |
-| Canonical artifacts | `../api/redot-26.2/4f5b14aba-single-windows-x86_64/` |
+| Quick-start generated artifacts | `build/api/` (not distributed) |
 | Machine lock | `redot-api.lock.json` |
 | Patch queue | Empty; JSON mode starts with unmodified gdext |
 | Rapier consumer | Godot Rapier Physics `0.8.40`, commit `de3458c23426fe332e491013c4412fe1fb84e778`, unchanged source |
@@ -50,4 +48,4 @@
 
 The macOS builder was also rerun from a fresh output/cache directory and produced independently audited universal binaries. Native build products are not promised to be byte-for-byte reproducible; the deterministic release archive contract applies to a fixed pair of input binaries.
 
-This lock is sufficient for local implementation and CI reproduction. External repository creation and publication remain separate because they were not authorized.
+This lock defines the build inputs for local and CI reproduction. Retained evidence and the CI coverage boundary are documented in `docs/compatibility.md` and `docs/limitations.md`.

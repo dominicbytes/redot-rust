@@ -24,7 +24,7 @@ The repository includes:
 | Rust | `1.94.0` |
 | Candidate version | `0.1.0+redot.26.2.1` |
 
-Windows x86-64 and Linux x86-64 debug/release builds, editor loads, runtime fixtures, exports, binary audits, and clean-install flows are locally proven. macOS universal debug/release builds, unsigned exports, bundle inventories, static binary audits, target archives, and clean installations are also locally proven; native execution is implemented in CI and must pass on macOS before a three-platform public release is claimed. See [compatibility](docs/compatibility.md) and [limitations](docs/limitations.md).
+Windows x86-64 and Linux x86-64 debug/release builds, editor loads, runtime fixtures, exports, binary audits, and clean-install flows are locally proven. macOS universal debug/release builds, unsigned exports, bundle inventories, static binary audits, target archives, and clean installations are also locally proven; native source and clean-installed project execution are configured in CI. Native macOS exported-app execution remains unverified and has no CI gate, so a green workflow alone does not establish full three-platform export support. See [compatibility](docs/compatibility.md) and [limitations](docs/limitations.md).
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ The generated API and engine binaries are intentionally not distributed.
 
 ## Quick start
 
-Set the editor and Cargo paths for the current shell:
+Run these commands from the repository root. Set the editor and Cargo paths for the current shell:
 
 ```powershell
 $env:REDOT_BIN = "<path-to-redot-editor>"
@@ -50,19 +50,24 @@ Reproduce and validate the locked API artifacts:
 ```powershell
 python tools\dump_redot_api.py `
   --redot-bin $env:REDOT_BIN `
-  --output-dir ..\build\redot-rust-compat\api `
+  --output-dir build\api `
   --lock redot-api.lock.json
 
-python tools\inspect_redot_api.py --lock redot-api.lock.json
+python tools\inspect_redot_api.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json --api-only
 ```
+
+The dump command validates the API, C interface header, editor, and launcher against the lock. The inspector above rechecks only the generated API; it does not use the lock's default companion paths. Keep generated artifacts in `build/api/`.
 
 Build through the adapter so Cargo receives only the validated JSON path:
 
 ```powershell
-python tools\configure_cargo.py --lock redot-api.lock.json -- `
+python tools\configure_cargo.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json -- `
   $Cargo build --workspace
 
-python tools\configure_cargo.py --lock redot-api.lock.json -- `
+python tools\configure_cargo.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json -- `
   $Cargo build --workspace --release
 ```
 
@@ -82,11 +87,14 @@ Run the source checks:
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py"
-python tools\configure_cargo.py --lock redot-api.lock.json -- `
+python tools\configure_cargo.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json -- `
   $Cargo fmt --all -- --check
-python tools\configure_cargo.py --lock redot-api.lock.json -- `
+python tools\configure_cargo.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json -- `
   $Cargo clippy --workspace --all-targets --all-features -- -D warnings
-python tools\configure_cargo.py --lock redot-api.lock.json -- `
+python tools\configure_cargo.py --lock redot-api.lock.json `
+  --api build\api\extension_api.json -- `
   $Cargo test --workspace --all-features
 ```
 
@@ -94,7 +102,7 @@ Reproduce both universal macOS libraries from Windows or Linux with the pinned c
 
 ```powershell
 python tools\build_macos_universal.py `
-  --api <validated-extension-api.json> `
+  --api build\api\extension_api.json `
   --output-dir ..\build\redot-rust-compat\macos-universal
 ```
 

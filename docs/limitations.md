@@ -16,7 +16,7 @@ Redot 26.2 does not expose a GDExtension interface JSON dump. The pinned gdext b
 
 ## Platform scope
 
-Windows x86-64 and Linux x86-64 debug/release are locally built and run. macOS universal debug/release binaries are locally cross-built, statically audited, exported, checked inside the app bundles, packaged, and clean-installed. Native editor, exported-app, and clean-install execution still require the implemented macOS CI job; the candidate is not advertised as a completed three-platform public release until that job passes. Android, iOS, Web, headless/server-specific packages, double precision, and non-x86-64 Linux/Windows are out of scope for this candidate.
+Windows x86-64 and Linux x86-64 debug/release are locally built and run. macOS universal debug/release binaries are locally cross-built, statically audited, exported, checked inside the app bundles, packaged, and clean-installed. Native source-project editor/runtime and clean-installed project execution are configured in the macOS CI job; no native macOS pass is established by the retained evidence. No CI job obtains export templates, exports applications, audits exported products, or executes exported applications. Native macOS exported-app execution remains unverified and has no automated gate, even if all current CI jobs pass. A completed three-platform export-support claim requires that additional native evidence. Android, iOS, Web, headless/server-specific packages, double precision, and non-x86-64 Linux/Windows are out of scope for this candidate.
 
 No code signing or notarization is performed. Those are distribution-owner steps after unsigned functional validation.
 
@@ -26,4 +26,4 @@ The binary archive is a smoke-test add-on, not a runtime that replaces gdext. A 
 
 ## Rapier boundary
 
-The consumer proof is not a Rapier port release. It proves that the shared adapter supports the most recent compatible Rapier baseline found (`0.8.40`) without modifying its source or copying binding fixes. Later Rapier versions that use newer Godot APIs remain Priority 7 work.
+The consumer proof is not a Rapier port release. It proves that the shared adapter supports the most recent compatible Rapier baseline found (`0.8.40`) without modifying its source or copying binding fixes. Porting later Rapier versions that use newer Godot APIs remains separate work.

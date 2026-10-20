@@ -5,11 +5,38 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from tools.build_macos_universal import DEFAULT_IMAGE, MacBuildError, docker_command
+from tests.binary_fixtures import fat_binary
+from tools.build_macos_universal import (
+    DEFAULT_IMAGE,
+    MacBuildError,
+    build_macos_universal,
+    docker_command,
+)
 
 
 class BuildMacosUniversalTests(unittest.TestCase):
+    def test_audits_built_library_for_macos_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            source = output / "target/universal2-apple-darwin/debug/libredot_rust_smoke.dylib"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(fat_binary())
+            with (
+                patch("tools.build_macos_universal.load_lock"),
+                patch("tools.build_macos_universal.inspect_api"),
+                patch("tools.build_macos_universal.subprocess.run") as run,
+            ):
+                run.return_value.returncode = 0
+                report = build_macos_universal(
+                    root, root / "api.json", output, root / "lock.json", profiles=("debug",)
+                )
+            audit = report["binaries"]["debug"]
+            self.assertEqual(audit["status"], "PASS", audit["failures"])
+            self.assertEqual(audit["expected_target"], "macos-universal")
+
     def test_command_pins_image_toolchain_target_and_read_only_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

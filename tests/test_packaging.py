@@ -56,7 +56,7 @@ class PackagingTests(unittest.TestCase):
 
     def test_package_is_deterministic_and_installs_without_overwrite(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             repo = self._repo(root)
             debug = root / "debug.dll"
             release = root / "release.dll"

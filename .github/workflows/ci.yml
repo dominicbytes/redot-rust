@@ -17,11 +17,12 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the locked Rust toolchain
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
           rustup default 1.94.0
           cargo fetch --locked
@@ -29,6 +30,7 @@ jobs:
       - name: Download and verify Redot 26.2
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory -Force build/redot | Out-Null
           $archive = "build/redot/Redot_v26.2-stable_windows_win64.zip"
           curl.exe --fail --location --output $archive "https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_windows_win64.zip"
@@ -44,11 +46,13 @@ jobs:
       - name: Reproduce the locked API
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python tools/dump_redot_api.py --redot-bin $env:REDOT_BIN --output-dir build/api --lock redot-api.lock.json
 
       - name: Unit, format, lint, and Rust tests
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python -m unittest discover -s tests -p "test_*.py"
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo fmt --all -- --check
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -57,15 +61,17 @@ jobs:
       - name: Build, audit, and stage both profiles
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace --release
           python tools/stage_extension.py --target windows-x86_64 --target-dir target --project-dir fixtures/redot-project
-          python tools/verify_binary_deps.py target/debug/redot_rust_smoke.dll --architecture x86_64 --report reports/ci/windows/debug-binary.json
-          python tools/verify_binary_deps.py target/release/redot_rust_smoke.dll --architecture x86_64 --report reports/ci/windows/release-binary.json
+          python tools/verify_binary_deps.py target/debug/redot_rust_smoke.dll --target windows-x86_64 --architecture x86_64 --report reports/ci/windows/debug-binary.json
+          python tools/verify_binary_deps.py target/release/redot_rust_smoke.dll --target windows-x86_64 --architecture x86_64 --report reports/ci/windows/release-binary.json
 
       - name: Run editor and runtime fixtures
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python tools/materialize_fixture.py --source-project fixtures/redot-project --output-project build/fixture-debug --target windows-x86_64 --profile debug
           python tools/materialize_fixture.py --source-project fixtures/redot-project --output-project build/fixture-release --target windows-x86_64 --profile release
           python tools/run_fixture.py build/fixture-debug --redot-bin $env:REDOT_BIN --report-dir reports/ci/windows/debug
@@ -74,6 +80,7 @@ jobs:
       - name: Package and verify clean installs
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python tools/package_release.py --target windows-x86_64 --debug-binary target/debug/redot_rust_smoke.dll --release-binary target/release/redot_rust_smoke.dll --output-dir dist
           $package = (Get-ChildItem dist -Filter "*windows-x86_64.zip" | Select-Object -First 1).FullName
           python tools/prepare_clean_install.py --source-project tests/clean-install-fixture --output-project build/clean-debug --package $package --target windows-x86_64 --profile debug --report reports/ci/windows/clean-debug-install.json
@@ -81,7 +88,7 @@ jobs:
           python tools/run_installed_fixture.py --project build/clean-debug --target windows-x86_64 --redot-bin $env:REDOT_BIN --report-dir reports/ci/windows/clean-debug
           python tools/run_installed_fixture.py --project build/clean-release --target windows-x86_64 --redot-bin $env:REDOT_BIN --report-dir reports/ci/windows/clean-release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: windows-evidence
@@ -94,7 +101,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the locked Rust toolchain
         run: |
@@ -104,6 +111,7 @@ jobs:
 
       - name: Download and verify Redot 26.2
         run: |
+          set -o pipefail
           mkdir -p build/redot/editor
           archive="build/redot/Redot_v26.2-stable_linux_x64.zip"
           curl --fail --location --output "$archive" "https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip"
@@ -117,19 +125,29 @@ jobs:
       - name: Reproduce the locked API
         run: |
           mkdir -p build/api
-          (cd build/api && "$REDOT_BIN" --headless --dump-extension-api)
-          (cd build/api && "$REDOT_BIN" --headless --dump-gdextension-interface)
+          python3 - <<'PY'
+          import os
+          import subprocess
+
+          for mode in ("--dump-extension-api", "--dump-gdextension-interface"):
+              subprocess.run(
+                  [os.environ["REDOT_BIN"], "--headless", "--audio-driver", "Dummy", "--quit-after", "2", mode],
+                  cwd="build/api", check=True, timeout=60,
+              )
+          PY
           python3 tools/inspect_redot_api.py --api-only --api build/api/extension_api.json
 
       - name: Build, test, audit, and stage both profiles
         run: |
           python3 -m unittest discover -s tests -p 'test_*.py'
+          python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo fmt --all -- --check
+          python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo clippy --workspace --all-targets --all-features -- -D warnings
           python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo test --workspace --all-features
           python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace
           python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace --release
           python3 tools/stage_extension.py --target linux-x86_64 --target-dir target --project-dir fixtures/redot-project
-          python3 tools/verify_binary_deps.py target/debug/libredot_rust_smoke.so --architecture x86_64 --report reports/ci/linux/debug-binary.json
-          python3 tools/verify_binary_deps.py target/release/libredot_rust_smoke.so --architecture x86_64 --report reports/ci/linux/release-binary.json
+          python3 tools/verify_binary_deps.py target/debug/libredot_rust_smoke.so --target linux-x86_64 --architecture x86_64 --report reports/ci/linux/debug-binary.json
+          python3 tools/verify_binary_deps.py target/release/libredot_rust_smoke.so --target linux-x86_64 --architecture x86_64 --report reports/ci/linux/release-binary.json
 
       - name: Run editor and runtime fixtures
         run: |
@@ -147,7 +165,7 @@ jobs:
           python3 tools/run_installed_fixture.py --project build/clean-debug --target linux-x86_64 --redot-bin "$REDOT_BIN" --report-dir reports/ci/linux/clean-debug
           python3 tools/run_installed_fixture.py --project build/clean-release --target linux-x86_64 --redot-bin "$REDOT_BIN" --report-dir reports/ci/linux/clean-release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: linux-evidence
@@ -160,7 +178,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the locked Rust toolchain
         run: |
@@ -171,6 +189,7 @@ jobs:
 
       - name: Download and verify Redot 26.2
         run: |
+          set -o pipefail
           mkdir -p build/redot/editor
           archive="build/redot/Redot_v26.2-stable_macos_universal.zip"
           curl --fail --location --output "$archive" "https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_macos_universal.zip"
@@ -185,9 +204,24 @@ jobs:
       - name: Reproduce the locked API
         run: |
           mkdir -p build/api
-          (cd build/api && "$REDOT_BIN" --headless --dump-extension-api)
-          (cd build/api && "$REDOT_BIN" --headless --dump-gdextension-interface)
+          python3 - <<'PY'
+          import os
+          import subprocess
+
+          for mode in ("--dump-extension-api", "--dump-gdextension-interface"):
+              subprocess.run(
+                  [os.environ["REDOT_BIN"], "--headless", "--audio-driver", "Dummy", "--quit-after", "2", mode],
+                  cwd="build/api", check=True, timeout=60,
+              )
+          PY
           python3 tools/inspect_redot_api.py --api-only --api build/api/extension_api.json
+
+      - name: Unit, format, lint, and Rust tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo fmt --all -- --check
+          python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo clippy --workspace --all-targets --all-features -- -D warnings
+          python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo test --workspace --all-features
 
       - name: Build both architectures and create universal libraries
         run: |
@@ -199,8 +233,8 @@ jobs:
           lipo -create target/aarch64-apple-darwin/debug/libredot_rust_smoke.dylib target/x86_64-apple-darwin/debug/libredot_rust_smoke.dylib -output build/macos-universal/debug/libredot_rust_smoke.dylib
           lipo -create target/aarch64-apple-darwin/release/libredot_rust_smoke.dylib target/x86_64-apple-darwin/release/libredot_rust_smoke.dylib -output build/macos-universal/release/libredot_rust_smoke.dylib
           python3 tools/stage_extension.py --target macos-universal --debug-binary build/macos-universal/debug/libredot_rust_smoke.dylib --release-binary build/macos-universal/release/libredot_rust_smoke.dylib --project-dir fixtures/redot-project
-          python3 tools/verify_binary_deps.py build/macos-universal/debug/libredot_rust_smoke.dylib --architecture arm64 --architecture x86_64 --report reports/ci/macos/debug-binary.json
-          python3 tools/verify_binary_deps.py build/macos-universal/release/libredot_rust_smoke.dylib --architecture arm64 --architecture x86_64 --report reports/ci/macos/release-binary.json
+          python3 tools/verify_binary_deps.py build/macos-universal/debug/libredot_rust_smoke.dylib --target macos-universal --architecture arm64 --architecture x86_64 --report reports/ci/macos/debug-binary.json
+          python3 tools/verify_binary_deps.py build/macos-universal/release/libredot_rust_smoke.dylib --target macos-universal --architecture arm64 --architecture x86_64 --report reports/ci/macos/release-binary.json
 
       - name: Run native editor and runtime fixtures
         run: |
@@ -218,7 +252,7 @@ jobs:
           python3 tools/run_installed_fixture.py --project build/clean-debug --target macos-universal --redot-bin "$REDOT_BIN" --report-dir reports/ci/macos/clean-debug
           python3 tools/run_installed_fixture.py --project build/clean-release --target macos-universal --redot-bin "$REDOT_BIN" --report-dir reports/ci/macos/clean-release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: macos-evidence

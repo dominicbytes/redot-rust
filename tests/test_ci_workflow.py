@@ -59,6 +59,16 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertNotIn(version, text)
         self.assertNotIn("releases/download/", text)
 
+    def test_every_engine_lane_fetches_locked_dependencies(self) -> None:
+        jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
+        lanes = [job for job in jobs if "needs: engine-profiles" in job]
+        self.assertEqual(len(lanes), 3)
+        for lane in lanes:
+            with self.subTest(lane=lane.splitlines()[0]):
+                toolchain = lane.split("- name: Install the locked Rust toolchain", 1)[1].split("      - name:", 1)[0]
+                self.assertEqual(toolchain.count("cargo fetch --locked"), 1)
+                self.assertLess(toolchain.index("rustup default"), toolchain.index("cargo fetch --locked"))
+
     def test_every_binary_audit_enforces_its_lane_target(self) -> None:
         jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
         for job, target in zip(jobs[1:], ("windows-x86_64", "linux-x86_64", "macos-universal"), strict=True):

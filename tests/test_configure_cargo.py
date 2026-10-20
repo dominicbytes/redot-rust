@@ -111,6 +111,22 @@ class ConfigureCargoTests(unittest.TestCase):
                 env = remap_environment({"CARGO_BUILD_TARGET": "x86_64-pc-windows-msvc"}, self.root, command)
                 self.assertEqual("PDBALTPATH" in env["CARGO_ENCODED_RUSTFLAGS"], expected)
 
+    def test_binding_environment_preserves_explicit_cargo_targets(self) -> None:
+        for targets, expected in (
+            (["--target", "x86_64-unknown-linux-gnu"], False),
+            (["--target=aarch64-apple-darwin"], False),
+            (["--target", "x86_64-pc-windows-msvc"], True),
+            (["--target=x86_64-pc-windows-msvc", "--target=aarch64-apple-darwin"], False),
+        ):
+            with self.subTest(targets=targets):
+                env, report = prepare_environment(
+                    self.lock_path, self.api_path, None,
+                    {"CARGO_BUILD_TARGET": "x86_64-pc-windows-msvc"},
+                    ["cargo", "build", *targets],
+                )
+                self.assertEqual("PDBALTPATH" in env["CARGO_ENCODED_RUSTFLAGS"], expected)
+                self.assertEqual(json.loads(env["REDOT_RUST_BINDING_ABI"]), report["binding_abi"])
+
     def test_example_path_is_resolved_by_real_cargo_from_repository_root(self) -> None:
         cargo = shutil.which("cargo")
         if cargo is None:

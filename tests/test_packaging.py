@@ -3,6 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import json
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -12,6 +13,25 @@ from unittest.mock import patch
 
 from tools.install_package import InstallError, inspect_package, install_package
 from tools.package_release import MANIFEST_NAME, PackageError, _validate_payload, create_package
+
+
+def minimal_pe() -> bytes:
+    data = bytearray(0x1000)
+    data[:2] = b"MZ"
+    struct.pack_into("<I", data, 0x3C, 0x80)
+    data[0x80:0x84] = b"PE\0\0"
+    struct.pack_into("<HH", data, 0x84, 0x8664, 1)
+    struct.pack_into("<H", data, 0x94, 0xF0)
+    struct.pack_into("<H", data, 0x96, 0x2002)
+    struct.pack_into("<H", data, 0x98, 0x20B)
+    struct.pack_into("<I", data, 0x98 + 108, 16)
+    struct.pack_into("<IIII", data, 0x188 + 8, 0xE00, 0x1000, 0xE00, 0x200)
+    struct.pack_into("<II", data, 0x98 + 112, 0x1000, 40)
+    struct.pack_into("<I", data, 0x200 + 24, 1)
+    struct.pack_into("<I", data, 0x200 + 32, 0x1040)
+    struct.pack_into("<I", data, 0x240, 0x1080)
+    data[0x280:0x290] = b"gdext_rust_init\0\0"
+    return bytes(data)
 
 
 class PackagingTests(unittest.TestCase):
@@ -139,25 +159,6 @@ class PackagingTests(unittest.TestCase):
                     _validate_payload("bin/smoke.dll", data)
 
     def test_binary_path_marker_stops_real_package_creation(self) -> None:
-        import struct
-
-        def minimal_pe() -> bytes:
-            data = bytearray(0x1000)
-            data[:2] = b"MZ"
-            struct.pack_into("<I", data, 0x3C, 0x80)
-            data[0x80:0x84] = b"PE\0\0"
-            struct.pack_into("<HH", data, 0x84, 0x8664, 1)
-            struct.pack_into("<H", data, 0x94, 0xF0)
-            struct.pack_into("<H", data, 0x96, 0x2002)
-            struct.pack_into("<H", data, 0x98, 0x20B)
-            struct.pack_into("<I", data, 0x98 + 108, 16)
-            struct.pack_into("<IIII", data, 0x188 + 8, 0xE00, 0x1000, 0xE00, 0x200)
-            struct.pack_into("<II", data, 0x98 + 112, 0x1000, 40)
-            struct.pack_into("<I", data, 0x200 + 24, 1)
-            struct.pack_into("<I", data, 0x200 + 32, 0x1040)
-            struct.pack_into("<I", data, 0x240, 0x1080)
-            data[0x280:0x290] = b"gdext_rust_init\0\0"
-            return bytes(data)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = self._repo(root)

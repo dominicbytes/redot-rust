@@ -1,5 +1,5 @@
 {
-  "reason": "Official Windows editor shutdown leaks reproduce in an empty project.",
+  "reason": "Official Windows editor shutdown leaks and access violations reproduce in an empty project.",
   "removal_condition": "Pin an official engine containing the shutdown fix, then remove this exception.",
   "diagnostics": [
     "WARNING: 2 RIDs of type \"Canvas\" were leaked.",
@@ -9,5 +9,18 @@
     "ERROR: 100 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
     "ERROR: 1 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
     "WARNING: ObjectDB instances leaked at exit (run with --verbose for details)."
-  ]
+  ],
+  "abnormal_exit_codes": [
+    3221225477,
+    -1073741819
+  ],
+  "crash_diagnostics": [
+    "CrashHandlerException: Program crashed with signal 11",
+    "Engine version: Redot Engine v26.3.stable.official (85e5203945af15755dd2f66cb6fdf7545fd88c0b)",
+    "Dumping the backtrace. Please include this when reporting the bug on: https://github.com/Redot-Engine/redot-engine/issues",
+    "-- END OF C++ BACKTRACE --"
+  ],
+  "crash_frame_count": 13,
+  "crash_frame_template": "[{index}] error(-1): no debug info in PE/COFF executable",
+  "crash_separator": "================================================================"
 }

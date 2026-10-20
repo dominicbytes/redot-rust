@@ -22,11 +22,23 @@ is outside this release.
 
 Use `reloadable = false` and restart after replacing a native library. Editor
 initialization allows 120 frames and a wall-clock timeout. Official Windows
-26.3 has a temporary seven-line shutdown-leak exception, reproduced on an empty
-project. It is exact-engine, exact-diagnostic and initialization-only, with all
-stage/tool markers and fresh caches required. Abnormal exits remain rejected;
-a generic crash is not evidence for this exception. Remove it when an official
-engine containing the shutdown fix is pinned.
+26.3 has two temporary editor-initialization exceptions, both reproduced
+without an extension. `shutdown-leaks` requires exit zero and exactly seven
+known shutdown diagnostics. `shutdown-abnormal-exit` requires only the Windows
+access violation `3221225477` / `-1073741819` (`0xC0000005`), with the exact
+crash-handler banner/backtrace grammar in the allowlist. The handler can be
+truncated at a complete line, including after its opening 64-equals separator;
+a bare abnormal exit remains a failure. No Linux/macOS signal form is enabled.
+
+Both forms require the locked official profile's binary hash and version,
+every stage/tool marker, completed filesystem scan/editor layout and fresh
+extension/class caches. Caches are deleted before each import; the extension
+list must match the project's descriptors, and these fixtures' global script
+class cache must be `list=[]`. Reports retain diagnostics and original exit
+codes, with `engine_import_exception.form` and `crash_handler_truncated` visible.
+Any extra diagnostic, incomplete work, other exit code or unofficial binary
+fails. Remove both forms when an official engine release containing the
+shutdown fix is pinned.
 
 Runtime, installed and exported execution remain strict. Installed fixtures
 can reuse only a separate successful import proof whose identities, markers
@@ -41,7 +53,7 @@ raw runtime dumps are separately audited; they do not replace the binding
 input. Custom interface JSON requires an explicit hash-locked interface mode.
 Direct `api-custom` rejects Redot's product major 26 and remains unsupported.
 
-Candidate Windows runtime checks cover both official profiles, but complete 26.3 qualification remains blocked by intermittent official editor abnormal shutdowns in debug and release checks. This also reproduces without an extension and is not covered by the seven-line exit-zero exception.
+Windows checks cover editor initialization, runtime smoke and clean installs for both official profiles and build profiles. The recorded 26.3 shutdown exceptions qualify completed imports only; they do not claim clean engine shutdown.
 Linux x86-64 and macOS universal execution require the configured native CI
 lanes, which remain pending.
 No CI job obtains export templates or runs exported applications; candidate

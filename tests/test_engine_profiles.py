@@ -4,13 +4,14 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from tools.engine_gate import (clear_import_caches, evaluate_fixture_identity,
                                evaluate_import_exception, run_process)
 from tools.redot_api import IdentityError, binding_identity, inspect_api, load_lock, validate_lock, verify_engine
-from tools.run_fixture import EDITOR_MARKERS, evaluate_run
+from tools.run_fixture import EDITOR_MARKERS, evaluate_run, run_fixture
 from tests.test_runtime_gates import result_for
 from tools.scan_redot_log import scan_text
 from tests.test_api_identity import FIXTURE, make_lock, sha256
@@ -109,6 +110,7 @@ class ImportExceptionTests(unittest.TestCase):
                         "version_string": identity["redot"]["version_string"],
                         "binary_sha256": asset["binaries"]["redot.windows.editor.x86_64.llvm.exe"]}
         config = json.loads((Path(__file__).parents[1] / identity["import_exception"]).read_text())
+        self.config = config
         self.text = "\n".join([*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem",
                                 "[ DONE ] loading_editor_layout", *config["diagnostics"]])
         self.command = ["engine", "--headless", "--editor", "--path", str(self.project), "--quit-after", "120"]
@@ -145,6 +147,125 @@ class ImportExceptionTests(unittest.TestCase):
                          {"runtime": {**self.runtime, "binary_sha256": "0" * 64}},
                          {"runtime": {**self.runtime, "target": "linux-x86_64"}}):
             self.assertIsNone(self.evaluate(**override))
+
+    def crash_text(self, *, frames=13, complete=True):
+        banner = [
+            "=" * 64,
+            "CrashHandlerException: Program crashed with signal 11",
+            "Engine version: Redot Engine v26.3.stable.official (85e5203945af15755dd2f66cb6fdf7545fd88c0b)",
+            "Dumping the backtrace. Please include this when reporting the bug on: https://github.com/Redot-Engine/redot-engine/issues",
+        ]
+        banner += [f"[{i}] error(-1): no debug info in PE/COFF executable" for i in range(1, frames + 1)]
+        if complete:
+            banner += ["-- END OF C++ BACKTRACE --", "=" * 64]
+        return "\n".join([*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem",
+                           "[ DONE ] loading_editor_layout", *banner])
+
+    def test_access_violation_accepts_only_observed_crash_grammar(self):
+        for code in (3221225477, -1073741819, 0xC0000005):
+            for frames, complete in ((13, True), (3, False), (0, False)):
+                with self.subTest(code=code, frames=frames, complete=complete):
+                    result = self.evaluate(self.crash_text(frames=frames, complete=complete), code=code)
+                    self.assertIsNotNone(result)
+                    self.assertEqual(result["form"], "shutdown-abnormal-exit")
+                    self.assertEqual(result["returncode"], code)
+                    self.assertIn("CrashHandlerException: Program crashed with signal 11", result["diagnostics"])
+        self.assertEqual(self.evaluate()["form"], "shutdown-leaks")
+        self.assertIsNotNone(self.evaluate(self.crash_text(), code=3221225477,
+                                         command=[arg.replace("--editor", "--import") for arg in self.command]))
+        self.assertIsNone(self.evaluate(self.crash_text(), code=3221225477,
+                                       command=[arg for arg in self.command if arg != "--editor"]))
+        # Shutdown leaks may precede the crash, but no other diagnostics may do so.
+        self.assertIsNotNone(self.evaluate(self.text + "\n" + self.crash_text(), code=3221225477))
+
+    def test_separator_only_truncated_handler_requires_all_completed_work(self):
+        text = "\n".join([*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem",
+                           "[ DONE ] loading_editor_layout", "=" * 64])
+        result = self.evaluate(text, code=3221225477)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["form"], "shutdown-abnormal-exit")
+        self.assertTrue(result["crash_handler_truncated"])
+        for replacement in ("", "=" * 63, "=" * 65, "other output"):
+            self.assertIsNone(self.evaluate(text.replace("=" * 64, replacement), code=3221225477))
+        for marker in (*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem", "[ DONE ] loading_editor_layout"):
+            self.assertIsNone(self.evaluate(text.replace(marker, ""), code=3221225477))
+        for extra in ("ERROR: unrelated", "WARNING: unrelated", "FATAL: unrelated"):
+            self.assertIsNone(self.evaluate(extra + "\n" + text, code=3221225477))
+            self.assertIsNone(self.evaluate(text + "\n" + extra, code=3221225477))
+        self.assertIsNone(self.evaluate(text, code=7))
+        self.assertIsNone(self.evaluate(text, code=0))
+        self.assertIsNone(self.evaluate(text, code=3221225477, context="runtime"))
+        self.assertIsNone(self.evaluate(text, code=3221225477,
+                                       runtime={**self.runtime, "profile": "redot-26.2"}))
+        self.assertIsNone(self.evaluate(text, code=3221225477,
+                                       runtime={**self.runtime, "binary_sha256": "0" * 64}))
+        clear_import_caches(self.project)
+        self.assertIsNone(self.evaluate(text, code=3221225477))
+
+    def test_access_violation_rejects_incomplete_or_foreign_work(self):
+        text = self.crash_text()
+        for marker in (*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem", "[ DONE ] loading_editor_layout"):
+            with self.subTest(marker=marker):
+                self.assertIsNone(self.evaluate(text.replace(marker, ""), code=3221225477))
+        for code in (0, 1, 7, 42, -11, 139, -1073740791):
+            self.assertIsNone(self.evaluate(text, code=code))
+        for extra in ("ERROR: unrelated", "WARNING: unrelated", "FATAL: unrelated"):
+            self.assertIsNone(self.evaluate(text + "\n" + extra, code=3221225477))
+            self.assertIsNone(self.evaluate(extra + "\n" + text, code=3221225477))
+        for runtime in ({**self.runtime, "profile": "redot-26.2"},
+                        {**self.runtime, "binary_sha256": "0" * 64},
+                        {**self.runtime, "version_string": "26.3.stable.custom_build.85e520394"},
+                        {**self.runtime, "target": "linux-x86_64"},
+                        {**self.runtime, "target": "macos-universal"}):
+            self.assertIsNone(self.evaluate(text, code=3221225477, runtime=runtime))
+        self.assertIsNone(self.evaluate(text, code=3221225477, timed_out=True))
+        for context in ("runtime", "installed", "exported"):
+            self.assertIsNone(self.evaluate(text, code=3221225477, context=context))
+        for extra in ("--script", "main.gd", "main.tscn", "--export-release", "--"):
+            self.assertIsNone(self.evaluate(text, code=3221225477, command=[*self.command, extra]))
+        for cache in ("extension_list.cfg", "global_script_class_cache.cfg"):
+            path = self.cache / cache
+            original = path.read_text()
+            for replacement in (None, "invalid", "list=[unexpected]"):
+                if replacement is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_text(replacement)
+                self.assertIsNone(self.evaluate(text, code=3221225477))
+            path.write_text(original)
+
+    def test_crash_banner_cannot_replace_a_completed_import(self):
+        text = self.crash_text()
+        header = "CrashHandlerException: Program crashed with signal 11"
+        for changed in (text.replace(header, ""),
+                        text.replace("signal 11", "signal 6"),
+                        text.replace("[2] error", "[9] error"),
+                        text.replace("no debug info", "different error"),
+                        text.replace("85e5203945af15755dd2f66cb6fdf7545fd88c0b", "wrong"),
+                        text + "\n[14] error(-1): no debug info in PE/COFF executable"):
+            self.assertIsNone(self.evaluate(changed, code=3221225477))
+        self.assertIsNone(self.evaluate(text[text.index(header):] + "\n" + self.text, code=3221225477))
+        # Even perfect runtime assertions and this exit must fail all runtime gates.
+        for kind in ("smoke", "clean-install", "exported-smoke", "exported-clean-install"):
+            self.assertTrue(evaluate_run(3221225477, False, result_for(kind), scan_text(text), fixture_type=kind))
+
+    def test_import_harness_preserves_abnormal_exit_in_visible_pass_report(self):
+        def process(command, timeout):
+            self.assertFalse((self.cache / "extension_list.cfg").exists())
+            self.assertFalse((self.cache / "global_script_class_cache.cfg").exists())
+            (self.cache / "extension_list.cfg").write_text("res://smoke.gdextension\n")
+            (self.cache / "global_script_class_cache.cfg").write_text("list=[]")
+            return 3221225477, False, self.crash_text(), ""
+        with patch("tools.run_fixture.verify_engine", return_value=self.runtime), patch(
+            "tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=self.project / "engine")
+        ), patch("tools.run_fixture._run_process", side_effect=process):
+            report = run_fixture(self.project, self.project / "engine", self.project / "evidence",
+                                 initialize_only=True, engine_profile_name="redot-26.3")
+        self.assertEqual(report["status"], "PASS", report["failures"])
+        self.assertEqual(report["initialization"]["returncode"], 3221225477)
+        self.assertEqual(report["initialization"]["engine_import_exception"]["form"], "shutdown-abnormal-exit")
+        self.assertTrue(report["initialization"]["findings"])
+        self.assertEqual(len(report["import_cache_sha256"]), 2)
 
     def test_same_shutdown_lines_fail_runtime_installed_and_exported_gates(self):
         findings = scan_text(self.text)

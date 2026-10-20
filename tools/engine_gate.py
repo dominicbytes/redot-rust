@@ -80,33 +80,83 @@ def clear_import_caches(project: Path) -> None:
         (project / ".godot" / name).unlink(missing_ok=True)
 
 
+def _shutdown_crash_lines(text: str, config: dict) -> tuple[str, list[str]] | None:
+    """Accept only a prefix of the measured Windows crash-handler output."""
+    lines = text.splitlines()
+    header, version, dump, end = config["crash_diagnostics"]
+    starts = [i for i, line in enumerate(lines) if line.strip() == header]
+    if not starts:
+        # A real access violation can truncate the handler immediately after
+        # its opening separator, before even the first diagnostic is flushed.
+        nonempty = [i for i, line in enumerate(lines) if line.strip()]
+        if not nonempty or lines[nonempty[-1]].strip() != config["crash_separator"]:
+            return None
+        start = nonempty[-1]
+        return "\n".join(lines[:start]), [config["crash_separator"]]
+    if len(starts) != 1:
+        return None
+    start = starts[0]
+    before = "\n".join(lines[:start])
+    crash = [line.strip() for line in lines[start:] if line.strip()]
+    pending = list(crash)
+    # The handler can terminate before printing its complete banner/backtrace.
+    for expected in (header, version, dump):
+        if not pending:
+            return before, crash
+        if pending.pop(0) != expected:
+            return None
+    for index in range(1, config["crash_frame_count"] + 1):
+        if not pending or pending[0] == end:
+            break
+        if pending.pop(0) != config["crash_frame_template"].format(index=index):
+            return None
+    if pending not in ([], [end], [end, config["crash_separator"]]):
+        return None
+    return before, crash
+
+
 def evaluate_import_exception(text: str, code: int, timed_out: bool, *, lock: dict,
                               runtime: dict, project: Path, markers: tuple[str, ...],
                               context: str, command: list[str]) -> dict | None:
     """Never used for a runtime or export; exact engine verification precedes this call."""
     name, identity = engine_profile(lock, runtime["profile"])
     relative = identity.get("import_exception")
-    if not relative or context != "editor-import" or runtime["target"] != "windows-x86_64":
+    if (name != "redot-26.3" or not relative or context != "editor-import"
+            or runtime["target"] != "windows-x86_64"):
         return None
     # Restrict even direct callers to editor initialization with no user payload.
-    if ("--editor" not in command or "--path" not in command or "--" in command
+    if (not any(arg in command for arg in ("--editor", "--import"))
+            or "--path" not in command or "--" in command
             or any(arg in ("--script", "-s", "--scene") or arg.startswith("--export")
                    or arg.endswith((".gd", ".tscn")) for arg in command)):
         return None
     config = json.loads((Path(__file__).resolve().parents[1] / relative).read_text())
     if (runtime["version_string"] != identity["redot"]["version_string"]
             or runtime["binary_sha256"] not in identity["assets"][runtime["target"]]["binaries"].values()
-            or timed_out or code != 0):
+            or timed_out or code not in (0, *config["abnormal_exit_codes"])):
         return None
     text = ANSI.sub("", text)
-    diagnostics = scan_text(text)
-    lines = [row["line"].strip() for row in diagnostics]
     allowed = set(config["diagnostics"])
-    if not lines or set(lines) != allowed or any(line not in allowed for line in lines):
+    crash_lines = []
+    if code:
+        crash = _shutdown_crash_lines(text, config)
+        if crash is None:
+            return None
+        completed_text, crash_lines = crash
+        form = "shutdown-abnormal-exit"
+    else:
+        completed_text = text
+        form = "shutdown-leaks"
+    # Match raw lines before sanitization; never let redaction broaden an exception.
+    if re.search(r"\bFATAL:", completed_text, re.I):
         return None
-    if any(marker not in text for marker in markers):
+    raw_lines = completed_text.splitlines()
+    lines = [raw_lines[row["line_number"] - 1].strip() for row in scan_text(completed_text)]
+    if any(line not in allowed for line in lines) or (not code and set(lines) != allowed):
         return None
-    if not all(re.search(r"\[ DONE \]\s+" + marker, text)
+    if any(marker not in completed_text for marker in markers):
+        return None
+    if not all(re.search(r"\[ DONE \]\s+" + marker, completed_text)
                for marker in ("first_scan_filesystem", "loading_editor_layout")):
         return None
     try:
@@ -117,10 +167,13 @@ def evaluate_import_exception(text: str, code: int, timed_out: bool, *, lock: di
         return None
     descriptors = ["res://" + path.relative_to(project).as_posix()
                    for path in project.rglob("*.gdextension") if ".godot" not in path.parts]
-    if not descriptors or not all(path in extensions for path in descriptors) or "list=" not in classes.replace(" ", ""):
+    # Qualified smoke/clean fixtures have no global GDScript classes.
+    if (not descriptors or set(extensions) != set(descriptors)
+            or not re.fullmatch(r"\s*list\s*=\s*\[\s*\]\s*", classes)):
         return None
-    return {"profile": name, "scope": context, "reason": config["reason"],
-            "diagnostics": config["diagnostics"], "returncode": code,
+    return {"profile": name, "scope": context, "form": form, "reason": config["reason"],
+            "diagnostics": lines + crash_lines, "returncode": code,
+            "crash_handler_truncated": bool(code and config["crash_diagnostics"][-1] not in crash_lines),
             "completed_stages": True, "fresh_caches_verified": True,
             "removal_condition": config["removal_condition"]}
 

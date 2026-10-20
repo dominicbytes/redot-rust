@@ -39,12 +39,18 @@ inventory and every member's hash/size. The installer rejects legacy or mixed
 manifest shapes before extraction. A profile in the lock is a qualification
 target, not a substitute for a completed platform gate; see compatibility.md.
 
-The seven-line official Windows editor exception is visible in a separate
-editor-initialization report as `engine_import_exception`. It requires exact
-binary/version identity, every extension/tool marker, completed filesystem
-scan/editor layout, fresh extension/class caches and exit zero. Unknown lines,
-missing proof, abnormal exits and other platforms fail. Installed and exported
-runtime gates never consume the exception. An installed run may consume a
-separate successful editor import report only when its identity, required
-markers and cache checksums still match. Remove the policy when an official
-engine containing the shutdown fix is pinned.
+The official Windows editor exception is visible in a separate editor-import
+report as `engine_import_exception`, with form `shutdown-leaks` or
+`shutdown-abnormal-exit`. Both require exact binary/version identity, every
+extension/tool marker, completed filesystem scan/editor layout and fresh,
+matching extension/class caches. The leak form requires exit zero and exactly
+the seven allowlisted diagnostics. The abnormal form requires Windows
+`0xC0000005` and only the exact crash-handler grammar (including the measured
+separator-only truncated form) plus any of those seven diagnostics. The report
+preserves original exit codes, diagnostics and `crash_handler_truncated`.
+Unknown diagnostics, missing proof, other exits, unofficial binaries and other
+platforms fail. Installed and exported runtime gates never consume the
+exception. An installed run may consume a separate successful editor import
+report only when its identity, required markers and cache checksums still
+match. Remove both forms when an official engine release containing the
+shutdown fix is pinned.

@@ -16,17 +16,22 @@ targets. The full archive, executable, raw API and interface identities are in
 | Target | Engine profiles | Candidate qualification |
 |---|---|---|
 | Windows x86-64 | `redot-26.2` | Debug/release editor + smoke 22/22, clean install 8/8, binary audit and v2 package validation pass |
-| Windows x86-64 | `redot-26.3` | Debug/release runtime smoke 22/22 and installed-fixture 8/8 checks pass; editor initialization has both exit-zero exception passes and intermittent abnormal shutdown failures |
+| Windows x86-64 | `redot-26.3` | Debug/release editor + smoke 22/22, clean install 8/8, binary audit and v2 package validation pass; completed imports record exact shutdown exceptions |
 | Linux x86-64 | Both | Native CI configured; candidate execution pending |
 | macOS universal | Both | Both architectures built/audited and native host execution configured in CI; candidate execution pending |
 
-The official Windows 26.3 editor's seven shutdown-leak diagnostics reproduce
-without an extension. An exit-zero editor initialization can pass only with
-the exact locked engine, all extension/tool markers, completed scan/layout and
-fresh caches. Its report records `engine_import_exception`; it is not a clean
-log. Extra diagnostics, incomplete initialization, abnormal exits, other engines
-and other platforms fail. Installed and exported runtime gates never use it.
-The official editor also intermittently reproduces an abnormal shutdown after completed initialization, without a preceding scan-thread warning. That form remains rejected; this candidate has no complete 26.3 qualification. The engine issue also reproduces on an empty project.
+The official Windows 26.3 editor's shutdown defect reproduces without an
+extension. Completed editor initialization may record `engine_import_exception`
+as `shutdown-leaks` (exit zero, exactly seven known lines) or
+`shutdown-abnormal-exit` (Windows `0xC0000005`, with only the allowlisted crash
+handler and any known shutdown lines). The handler may truncate immediately
+after its 64-equals separator or at a later complete line. Both forms require
+the locked binary/version, every extension/tool marker, completed scan/layout
+and freshly recreated matching extension/class caches. Reports retain the
+original exit, diagnostics and truncation status; an exception is not a clean
+shutdown. Unknown diagnostics, incomplete work, other exits/engines/platforms
+and bare abnormal exits fail. No Linux/macOS signal exception is enabled.
+Runtime, installed and exported gates never use either form.
 
 A clean install uses a separate successful import report and verifies its cache checksums
 before strict runtime execution. Pinning an official shutdown-fixed engine is

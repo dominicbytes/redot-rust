@@ -215,7 +215,7 @@ def run_fixture(
         init_log = sanitizer.text(init_log)
         sanitizer.write_text(report_dir / "redot-editor-init.log", init_log)
         initialization_failures = evaluate_initialization(
-            init_code, init_timeout, [] if exception else init_findings
+            0 if exception else init_code, init_timeout, [] if exception else init_findings
         )
         initialization_failures.extend(
             evaluate_markers(init_log, EDITOR_MARKERS, "editor initialization")

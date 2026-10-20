@@ -83,8 +83,8 @@ jobs:
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace
           python tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace --release
           python tools/stage_extension.py --target windows-x86_64 --target-dir target --project-dir fixtures/redot-project
-          python tools/verify_binary_deps.py target/debug/redot_rust_smoke.dll --target windows-x86_64 --architecture x86_64 --report reports/ci/windows/${{ matrix.engine_profile }}/debug-binary.json
-          python tools/verify_binary_deps.py target/release/redot_rust_smoke.dll --target windows-x86_64 --architecture x86_64 --report reports/ci/windows/${{ matrix.engine_profile }}/release-binary.json
+          python tools/verify_binary_deps.py target/debug/redot_rust_smoke.dll --target windows-x86_64 --exact-exports --architecture x86_64 --report reports/ci/windows/${{ matrix.engine_profile }}/debug-binary.json
+          python tools/verify_binary_deps.py target/release/redot_rust_smoke.dll --target windows-x86_64 --exact-exports --architecture x86_64 --report reports/ci/windows/${{ matrix.engine_profile }}/release-binary.json
 
       - name: Run editor and runtime fixtures
         shell: pwsh
@@ -155,8 +155,8 @@ jobs:
           python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace
           python3 tools/configure_cargo.py --api build/api/extension_api.json -- cargo build --workspace --release
           python3 tools/stage_extension.py --target linux-x86_64 --target-dir target --project-dir fixtures/redot-project
-          python3 tools/verify_binary_deps.py target/debug/libredot_rust_smoke.so --target linux-x86_64 --architecture x86_64 --report reports/ci/linux/${{ matrix.engine_profile }}/debug-binary.json
-          python3 tools/verify_binary_deps.py target/release/libredot_rust_smoke.so --target linux-x86_64 --architecture x86_64 --report reports/ci/linux/${{ matrix.engine_profile }}/release-binary.json
+          python3 tools/verify_binary_deps.py target/debug/libredot_rust_smoke.so --target linux-x86_64 --exact-exports --architecture x86_64 --report reports/ci/linux/${{ matrix.engine_profile }}/debug-binary.json
+          python3 tools/verify_binary_deps.py target/release/libredot_rust_smoke.so --target linux-x86_64 --exact-exports --architecture x86_64 --report reports/ci/linux/${{ matrix.engine_profile }}/release-binary.json
 
       - name: Run editor and runtime fixtures
         run: |
@@ -232,8 +232,8 @@ jobs:
           lipo -create target/aarch64-apple-darwin/debug/libredot_rust_smoke.dylib target/x86_64-apple-darwin/debug/libredot_rust_smoke.dylib -output build/macos-universal/debug/libredot_rust_smoke.dylib
           lipo -create target/aarch64-apple-darwin/release/libredot_rust_smoke.dylib target/x86_64-apple-darwin/release/libredot_rust_smoke.dylib -output build/macos-universal/release/libredot_rust_smoke.dylib
           python3 tools/stage_extension.py --target macos-universal --debug-binary build/macos-universal/debug/libredot_rust_smoke.dylib --release-binary build/macos-universal/release/libredot_rust_smoke.dylib --project-dir fixtures/redot-project
-          python3 tools/verify_binary_deps.py build/macos-universal/debug/libredot_rust_smoke.dylib --target macos-universal --architecture arm64 --architecture x86_64 --report reports/ci/macos/${{ matrix.engine_profile }}/debug-binary.json
-          python3 tools/verify_binary_deps.py build/macos-universal/release/libredot_rust_smoke.dylib --target macos-universal --architecture arm64 --architecture x86_64 --report reports/ci/macos/${{ matrix.engine_profile }}/release-binary.json
+          python3 tools/verify_binary_deps.py build/macos-universal/debug/libredot_rust_smoke.dylib --target macos-universal --exact-exports --architecture arm64 --architecture x86_64 --report reports/ci/macos/${{ matrix.engine_profile }}/debug-binary.json
+          python3 tools/verify_binary_deps.py build/macos-universal/release/libredot_rust_smoke.dylib --target macos-universal --exact-exports --architecture arm64 --architecture x86_64 --report reports/ci/macos/${{ matrix.engine_profile }}/release-binary.json
 
       - name: Run native editor and runtime fixtures
         run: |

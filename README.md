@@ -134,6 +134,15 @@ Invoke that consumer's Cargo command through `tools/configure_cargo.py`, or repr
 
 The Rapier proof applies a workspace-level `[patch.crates-io]` to this exact gdext revision and leaves the pinned Rapier source checkout byte-for-byte unchanged. Its report is under `reports/gauntlet/g02/final/`.
 
+Audit a consumer library with its own entry symbol:
+
+```bash
+python tools/verify_binary_deps.py <library> --target windows-x86_64 --architecture x86_64 \
+  --required-export rapier_2d_init --exact-exports --report <report.json>
+```
+
+The audit checks format, architecture, shared-library type, portable load paths and a strict system-dependency allowlist (on Windows: `KERNEL32`, `ntdll`, `bcryptprimitives`, `VCRUNTIME140`, `api-ms-win-core-synch-l1-2-0` and the UCRT heap, runtime, string and math API sets that Rust std uses). Any other dependency fails. `--exact-exports` also fails when a library, or any universal Mach-O slice, exports anything besides the entry symbol. The only permitted extra is gdext's Linux hot-reload hook `__cxa_thread_atexit_impl`. Reports count unexpected exports and list only short C-identifier names.
+
 ## Package and install
 
 Create a target archive after both profile binaries exist:

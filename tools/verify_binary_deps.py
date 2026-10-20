@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -444,12 +445,17 @@ def _macho_details(_path: Path, data: bytes) -> dict[str, Any]:
     }
 
 
-# The supported smoke builds import these release/system libraries. New native
-# dependencies require an explicit policy change; this package bundles none.
+# Pure-Rust extensions built with the pinned toolchain import these release/system
+# libraries. New native dependencies require an explicit policy change; this
+# package bundles none. On Windows, Rust std reaches the UCRT only through the
+# heap, runtime, string and (for floating-point math) math API sets; the other
+# api-ms-win-crt-* sets come from C/C++ code and stay rejected until a consumer
+# needs one.
 SYSTEM_DEPENDENCIES = {
     "windows": {
         "api-ms-win-core-synch-l1-2-0.dll",
         "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
         "api-ms-win-crt-runtime-l1-1-0.dll",
         "api-ms-win-crt-string-l1-1-0.dll",
         "bcryptprimitives.dll", "kernel32.dll", "ntdll.dll", "vcruntime140.dll",
@@ -457,6 +463,18 @@ SYSTEM_DEPENDENCIES = {
     "linux": {"ld-linux-x86-64.so.2", "libc.so.6", "libgcc_s.so.1"},
     "macos": {"/usr/lib/libSystem.B.dylib"},
 }
+# Exports the pinned gdext revision adds next to the entry symbol. On Linux its
+# #[gdextension] macro interposes glibc's TLS-destructor hook so hot reload can
+# unload the library (godot-ffi `register_hot_reload_workaround!`).
+FRAMEWORK_EXPORTS = {
+    "windows": set(),
+    "linux": {"__cxa_thread_atexit_impl"},
+    "macos": set(),
+}
+# Unexpected export names are listed only when they are short C identifiers;
+# anything else (mangled or malformed names) is counted, never echoed.
+REPORTABLE_EXPORT = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+MAX_LISTED_EXPORTS = 16
 TARGET_FORMATS = {
     "windows-x86_64": {"PE32+"},
     "linux-x86_64": {"ELF64"},
@@ -489,6 +507,7 @@ def audit_binary(
     expected_architectures: set[str],
     expected_target: str | None = None,
     required_export: str = "gdext_rust_init",
+    exact_exports: bool = False,
 ) -> dict[str, Any]:
     path = path.resolve()
     if not path.is_file():
@@ -523,10 +542,18 @@ def audit_binary(
     if not details["dependency_scan_complete"]:
         failures.append("native dependency scan is incomplete")
     slices = details.get("slices", [details])
+    permitted = {required_export} | FRAMEWORK_EXPORTS[platform]
+    unexpected: set[str] = set()
     for row in slices:
+        architecture = row.get("architecture", ",".join(details["architectures"]))
         if required_export not in row["exports"]:
-            architecture = row.get("architecture", ",".join(details["architectures"]))
             failures.append(f"required export is missing in {architecture}: {required_export}")
+        extra = sorted(set(row["exports"]) - permitted)
+        if exact_exports and extra:
+            failures.append(f"unexpected exports in {architecture}: {len(extra)}")
+        if "slices" in details:
+            row["unexpected_export_count"] = len(extra)
+        unexpected.update(extra)
     debug_dependencies = [name for name in details["dependencies"] if is_debug_runtime(name)]
     if debug_dependencies:
         failures.append("debug runtime dependencies found")
@@ -566,6 +593,11 @@ def audit_binary(
         "other_export_count": len(all_exports) - len(selected_exports),
         "debug_runtime_dependencies": debug_dependencies,
         "required_export": required_export,
+        "exact_exports": exact_exports,
+        "unexpected_export_count": len(unexpected),
+        "unexpected_exports": sorted(
+            name for name in unexpected if REPORTABLE_EXPORT.fullmatch(name)
+        )[:MAX_LISTED_EXPORTS],
         "failures": failures,
     }
 
@@ -576,6 +608,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--architecture", action="append", required=True)
     parser.add_argument("--target", choices=sorted(TARGET_FORMATS))
     parser.add_argument("--required-export", default="gdext_rust_init")
+    parser.add_argument(
+        "--exact-exports",
+        action="store_true",
+        help="fail when any export other than the entry symbol (and the pinned "
+        "gdext framework exports) is present, per slice",
+    )
     parser.add_argument("--report", type=Path)
     args = parser.parse_args(argv)
     try:
@@ -584,6 +622,7 @@ def main(argv: list[str] | None = None) -> int:
             expected_architectures=set(args.architecture),
             expected_target=args.target,
             required_export=args.required_export,
+            exact_exports=args.exact_exports,
         )
     except (BinaryAuditError, OSError, struct.error) as error:
         print(f"FAIL: {error}", file=sys.stderr)

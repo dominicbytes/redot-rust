@@ -41,7 +41,7 @@ raw runtime dumps are separately audited; they do not replace the binding
 input. Custom interface JSON requires an explicit hash-locked interface mode.
 Direct `api-custom` rejects Redot's product major 26 and remains unsupported.
 
-Candidate Windows runtime checks cover both official profiles, but complete 26.3 release qualification remains blocked by an official editor abnormal shutdown. This also reproduces without an extension and is not covered by the seven-line exit-zero exception.
+Candidate Windows runtime checks cover both official profiles, but complete 26.3 qualification remains blocked by intermittent official editor abnormal shutdowns in debug and release checks. This also reproduces without an extension and is not covered by the seven-line exit-zero exception.
 Linux x86-64 and macOS universal execution require the configured native CI
 lanes, which remain pending.
 No CI job obtains export templates or runs exported applications; candidate

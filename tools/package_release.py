@@ -84,11 +84,13 @@ PRIVATE_PATH_PATTERN = re.compile(
 # Native libraries contain short printable fragments by chance, such as a
 # bare `A:\` between NUL bytes in a large debug library. A leaked path always
 # names something below its root, so require a path character after a drive
-# root and a further separator after a UNC share.
+# root and a further separator after a UNC share. UNC shares only exist on
+# Windows build hosts, and the signed tables of Mach-O libraries can spell
+# one by chance, so only PE libraries are checked for them.
 BINARY_PATH_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+[^\x00-\x1f\\/:*?\"<>|]|" + POSIX_ROOTS +
-    r"|\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+\\)", re.I
+    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+[^\x00-\x1f\\/:*?\"<>|]|" + POSIX_ROOTS + ")", re.I
 )
+UNC_PATH_PATTERN = re.compile(r"(?<![A-Za-z0-9])\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+\\")
 # A Unicode POSIX root needs a string/text boundary and a second separator,
 # using ASCII separators because numeric tables can decode as Unicode spaces.
 # It is only applied to UTF-8 text: UTF-16 decodings of instructions and
@@ -320,6 +322,7 @@ def _validate_payload(name: str, data: bytes) -> None:
     checks = [
         (PRIVATE_PATH_PATTERN, texts),
         (BINARY_PATH_PATTERN, native_texts + wide_texts),
+        (UNC_PATH_PATTERN, native_texts + wide_texts if path.suffix.casefold() == ".dll" else []),
         (UNICODE_POSIX_ROOT_PATTERN, texts + native_texts),
     ]
     for pattern, candidates in checks:

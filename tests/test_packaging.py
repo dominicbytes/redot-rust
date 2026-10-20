@@ -142,8 +142,13 @@ class PackagingTests(unittest.TestCase):
             for marker in markers:
                 for encoding in ("ascii", "utf-16le"):
                     with self.subTest(name=name, marker=marker, encoding=encoding):
+                        data = b"\x01" + marker.encode(encoding) + b"\x00"
+                        if marker.startswith("\\\\") and name.endswith((".so", ".dylib")):
+                            # UNC shares only exist on Windows build hosts.
+                            _validate_payload(name, data)
+                            continue
                         with self.assertRaisesRegex(PackageError, "private absolute path") as caught:
-                            _validate_payload(name, b"\x01" + marker.encode(encoding) + b"\x00")
+                            _validate_payload(name, data)
                         self.assertNotIn(marker, str(caught.exception))
         with self.assertRaises(PackageError):
             _validate_payload("metadata.json", json.dumps({"path": markers[0]}).encode())

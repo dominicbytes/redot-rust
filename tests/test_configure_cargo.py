@@ -124,6 +124,15 @@ class ConfigureCargoTests(unittest.TestCase):
             self.assertIn("link-arg=/PDBALTPATH:%_PDB%", flags)
         env = remap_environment({"CARGO_BUILD_TARGET": "x86_64-unknown-linux-gnu"}, self.root)
         self.assertNotIn("PDBALTPATH", env["CARGO_ENCODED_RUSTFLAGS"])
+        # A `--target` argument decides over the host platform and the environment.
+        for command, expected in (
+            (["cargo", "build", "--target", "x86_64-unknown-linux-gnu"], False),
+            (["cargo", "build", "--target=aarch64-apple-darwin"], False),
+            (["cargo", "build", "--target", "x86_64-pc-windows-msvc"], True),
+        ):
+            with self.subTest(command=command):
+                env = remap_environment({"CARGO_BUILD_TARGET": "x86_64-pc-windows-msvc"}, self.root, command)
+                self.assertEqual("PDBALTPATH" in env["CARGO_ENCODED_RUSTFLAGS"], expected)
 
     def test_example_path_is_resolved_by_real_cargo_from_repository_root(self) -> None:
         cargo = shutil.which("cargo")

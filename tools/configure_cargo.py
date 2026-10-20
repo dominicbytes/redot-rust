@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -36,8 +36,21 @@ GDEXT_ENV_KEYS = (
 )
 
 
+def build_targets(environment: Mapping[str, str], command: Sequence[str]) -> list[str]:
+    """Return the Cargo targets selected by `--target` arguments or the environment."""
+    targets = []
+    for index, argument in enumerate(command):
+        if argument == "--target" and index + 1 < len(command):
+            targets.append(command[index + 1])
+        elif argument.startswith("--target="):
+            targets.append(argument.split("=", 1)[1])
+    if not targets and environment.get("CARGO_BUILD_TARGET"):
+        targets.append(environment["CARGO_BUILD_TARGET"])
+    return targets
+
+
 def remap_environment(
-    base_environment: Mapping[str, str], repo_root: Path
+    base_environment: Mapping[str, str], repo_root: Path, command: Sequence[str] = ()
 ) -> dict[str, str]:
     """Keep Cargo's flag precedence and encode paths containing spaces safely."""
     environment = dict(base_environment)
@@ -56,8 +69,10 @@ def remap_environment(
     for root, replacement in sorted(roots.items(), key=lambda item: len(str(item[0]))):
         for spelling in sorted({str(root), root.as_posix()}):
             flags.append(f"--remap-path-prefix={spelling}={replacement}")
-    target = environment.get("CARGO_BUILD_TARGET", "")
-    if target.endswith("-msvc") or (not target and sys.platform == "win32"):
+    # The MSVC linker argument breaks every other linker, so add it only when
+    # every selected target (or the host, without one) uses MSVC.
+    targets = build_targets(environment, command)
+    if all(target.endswith("-msvc") for target in targets) if targets else sys.platform == "win32":
         flags.extend(["-C", "link-arg=/PDBALTPATH:%_PDB%"])
     environment["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(flags)
     return environment
@@ -68,13 +83,14 @@ def prepare_environment(
     api_path: Path,
     interface_json: Path | None,
     base_environment: Mapping[str, str],
+    command: Sequence[str] = (),
 ) -> tuple[dict[str, str], dict]:
     lock_path = lock_path.resolve()
     api_path = api_path.resolve()
     lock = load_lock(lock_path)
     report = inspect_api(api_path, lock)
 
-    environment = remap_environment(base_environment, Path(__file__).resolve().parents[1])
+    environment = remap_environment(base_environment, Path(__file__).resolve().parents[1], command)
     for key in GDEXT_ENV_KEYS:
         environment.pop(key, None)
     environment["GDRUST_GODOT_API_JSON"] = str(api_path)
@@ -130,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise IdentityError("files.extension_api.path: required field is missing")
             api_path = resolve_locked_path(lock_path, api_value)
         environment, report = prepare_environment(
-            lock_path, api_path, args.interface_json, os.environ
+            lock_path, api_path, args.interface_json, os.environ, args.command
         )
     except IdentityError as error:
         print(f"FAIL: {error}", file=sys.stderr)

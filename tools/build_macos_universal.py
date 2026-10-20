@@ -18,7 +18,7 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.redot_api import IdentityError, inspect_api, load_lock  # noqa: E402
+from tools.redot_api import IdentityError, binding_identity, inspect_api, load_lock  # noqa: E402
 from tools.package_release import PackageError, _validate_payload  # noqa: E402
 from tools.verify_binary_deps import BinaryAuditError, audit_binary  # noqa: E402
 
@@ -44,6 +44,7 @@ def docker_command(
     output_dir: Path,
     profile: str,
     image: str = DEFAULT_IMAGE,
+    lock_path: Path | None = None,
 ) -> list[str]:
     if profile not in PROFILES:
         raise MacBuildError(f"unsupported profile: {profile}")
@@ -67,6 +68,8 @@ def docker_command(
         f"{api_path.resolve()}:/api/extension_api.json:ro",
         "-v",
         f"{output_dir.resolve()}:/output",
+        "-e",
+        "REDOT_RUST_BINDING_ABI=" + json.dumps(binding_identity(load_lock(lock_path or repo_root / "redot-api.lock.json")), sort_keys=True, separators=(",", ":")),
         "-e",
         "CARGO_ENCODED_RUSTFLAGS=" + "\x1f".join(
             (os.environ["CARGO_ENCODED_RUSTFLAGS"].split("\x1f")
@@ -105,7 +108,7 @@ def build_macos_universal(
     inspect_api(api_path, load_lock(lock_path.resolve()))
     binaries: dict[str, Any] = {}
     for profile in profiles:
-        command = docker_command(repo_root, api_path, output_dir, profile, image)
+        command = docker_command(repo_root, api_path, output_dir, profile, image, lock_path)
         try:
             completed = subprocess.run(command, timeout=timeout, check=False)
         except subprocess.TimeoutExpired as error:

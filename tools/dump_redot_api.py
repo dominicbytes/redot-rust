@@ -19,11 +19,15 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.scan_redot_log import EvidenceSanitizer, scan_text
+
 from tools.redot_api import (  # noqa: E402
     IdentityError,
     inspect_api,
     load_lock,
     sha256_file,
+    engine_profile,
+    verify_engine,
 )
 
 
@@ -90,9 +94,14 @@ def dump_snapshot(
     output_dir: Path,
     lock_path: Path,
     timeout: int,
+    engine_profile_name: str | None = None,
 ) -> dict:
     resolved = resolve_dump_editor(configured_bin)
     lock = load_lock(lock_path)
+    profile_name, _ = engine_profile(lock, engine_profile_name)
+    runtime = verify_engine(resolved.editor, lock, profile_name, timeout=timeout)
+    if resolved.launcher is not None:
+        verify_engine(resolved.launcher, lock, profile_name, timeout=timeout)
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -107,10 +116,14 @@ def dump_snapshot(
     with tempfile.TemporaryDirectory(prefix="redot-api-", dir=output_dir) as stage_name:
         stage = Path(stage_name)
         commands = [
-            [str(resolved.editor), "--headless", "--dump-extension-api"],
-            [str(resolved.editor), "--headless", "--dump-gdextension-interface"],
+            [str(resolved.editor), "--headless", "--audio-driver", "Dummy", "--quit-after", "2", "--log-file", str(stage / "api.log"), "--dump-extension-api"],
+            [str(resolved.editor), "--headless", "--audio-driver", "Dummy", "--quit-after", "2", "--log-file", str(stage / "interface.log"), "--dump-gdextension-interface"],
         ]
         command_results = [_run(command, stage, timeout) for command in commands]
+        for index, result in enumerate(command_results):
+            text = result.stdout + "\n" + result.stderr + "\n" + (stage / ("api.log" if index == 0 else "interface.log")).read_text(encoding="utf-8", errors="replace")
+            if scan_text(text):
+                raise DumpError("API dump emitted engine diagnostics")
         api = stage / "extension_api.json"
         interface = stage / "gdextension_interface.h"
         if not api.is_file() or not interface.is_file():
@@ -126,6 +139,7 @@ def dump_snapshot(
                 interface_header_path=interface,
                 editor_path=resolved.editor,
                 launcher_path=resolved.launcher,
+                engine_profile_name=profile_name,
             )
         except IdentityError as error:
             raise DumpError(f"generated snapshot does not match lock: {error}") from error
@@ -135,6 +149,7 @@ def dump_snapshot(
 
     snapshot = {
         "status": "PASS",
+        "runtime_engine": runtime,
         "configured_binary": str(Path(configured_bin).resolve()),
         "editor": str(resolved.editor),
         "launcher": str(resolved.launcher) if resolved.launcher else None,
@@ -150,6 +165,7 @@ def dump_snapshot(
             for index, result in enumerate(command_results)
         ],
     }
+    snapshot = EvidenceSanitizer({output_dir: "<DUMP_ROOT>", resolved.editor.parent: "<ENGINE_ROOT>"}).data(snapshot)
     (output_dir / "snapshot.json").write_text(
         json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -169,13 +185,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--lock", type=Path, default=Path("redot-api.lock.json"))
     parser.add_argument("--timeout", type=int, default=60)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--engine-profile")
+    group.add_argument("--binding", action="store_true")
     args = parser.parse_args(argv)
     try:
         snapshot = dump_snapshot(
-            args.redot_bin, args.output_dir, args.lock.resolve(), args.timeout
+            args.redot_bin, args.output_dir, args.lock.resolve(), args.timeout, (load_lock(args.lock)["binding_abi"]["engine_profile"] if args.binding else args.engine_profile)
         )
     except (DumpError, IdentityError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(snapshot["identity"], indent=2, sort_keys=True))
     return 0

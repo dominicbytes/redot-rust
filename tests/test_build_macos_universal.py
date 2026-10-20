@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -41,6 +42,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
     def test_command_pins_image_toolchain_target_and_read_only_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "redot-api.lock.json").write_bytes((Path(__file__).parents[1] / "redot-api.lock.json").read_bytes())
             api = root / "api" / "extension_api.json"
             output = root / "output"
             command = docker_command(root, api, output, "release")
@@ -55,6 +57,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
     def test_renamed_validated_api_is_the_only_mounted_api(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "redot-api.lock.json").write_bytes((Path(__file__).parents[1] / "redot-api.lock.json").read_bytes())
             api = root / "renamed-locked-api.json"
             api.write_text("locked")
             (root / "extension_api.json").write_text("unchecked sibling")

@@ -20,7 +20,8 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.package_release import ADDON_ROOT, MANIFEST_NAME  # noqa: E402
+from tools.package_release import ADDON_ROOT, MANIFEST_NAME
+from tools.redot_api import IdentityError, validate_lock  # noqa: E402
 
 
 class InstallError(RuntimeError):
@@ -117,8 +118,19 @@ def _inspect_package(package: zipfile.ZipFile, expected_target: str | None) -> d
         raise InstallError(f"package manifest is missing: {MANIFEST_NAME}")
     with package.open(inventory[MANIFEST_NAME]) as source:
         manifest = json.loads(source.read(MAX_MANIFEST_SIZE + 1).decode("utf-8"))
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 2:
         raise InstallError("unsupported package manifest schema")
+    if "redot" in manifest or "gdext" in manifest:
+        raise InstallError("mixed v1/v2 package identity")
+    try:
+        binding = manifest.get("binding_abi", {})
+        validate_lock({"schema_version": 2, "binding_abi": binding,
+                       "certified_engines": manifest.get("certified_engines"),
+                       "default_engine_profile": binding.get("engine_profile")})
+        if manifest.get("coverage") != binding["coverage"]:
+            raise IdentityError("manifest coverage differs from binding ABI")
+    except (IdentityError, AttributeError) as error:
+        raise InstallError("invalid package identity contract") from error
     if manifest.get("name") != "redot-rust-compat":
         raise InstallError("unexpected package name")
     if expected_target and manifest.get("target") != expected_target:

@@ -42,28 +42,14 @@ class PackagingTests(unittest.TestCase):
             (repo / name).write_text(name + "\n", encoding="utf-8")
         (repo / "docs" / "compatibility.md").write_text("compat\n", encoding="utf-8")
         (repo / "docs" / "limitations.md").write_text("limits\n", encoding="utf-8")
+        (repo / "docs" / "lock-schema.md").write_text("schema\n", encoding="utf-8")
         (repo / "docs" / "package-readme.md").write_text(
             "package\n", encoding="utf-8"
         )
-        (repo / "redot-api.lock.json").write_text(
-            json.dumps(
-                {
-                    "redot": {
-                        "version_string": "26.2.stable.official.test",
-                        "engine_commit": "engine",
-                        "precision": "single",
-                    },
-                    "godot_api": {
-                        "version_major": 4,
-                        "version_minor": 5,
-                        "version_patch": 2,
-                    },
-                    "files": {"extension_api": {"sha256": "API"}},
-                    "gdext": {"revision": "GDEXT", "crate_version": "0.5.5"},
-                }
-            ),
-            encoding="utf-8",
-        )
+        from tests.test_api_identity import FIXTURE, make_lock
+        api = repo / "extension_api.json"
+        api.write_bytes(FIXTURE.read_bytes())
+        (repo / "redot-api.lock.json").write_text(json.dumps(make_lock(api)))
         return repo
 
     @staticmethod
@@ -94,6 +80,10 @@ class PackagingTests(unittest.TestCase):
                 one = create_package(repo, "windows-x86_64", debug, release, first)
                 two = create_package(repo, "windows-x86_64", debug, release, second)
             self.assertEqual(one["archive_sha256"], two["archive_sha256"])
+            self.assertEqual(one["manifest"]["schema_version"], 2)
+            self.assertEqual(set(one["manifest"]["certified_engines"]), {"redot-26.2", "redot-26.3"})
+            self.assertEqual(one["manifest"]["coverage"]["unsupported_variant_types"], ["Struct"])
+            self.assertNotIn("redot", one["manifest"])
             with zipfile.ZipFile(first / one["archive"]) as archive:
                 self.assertIn("addons/redot-rust-compat/third-party/example-1.0/LICENSE", archive.namelist())
                 source = json.loads(archive.read("addons/redot-rust-compat/SOURCE.json"))
@@ -115,8 +105,14 @@ class PackagingTests(unittest.TestCase):
             root = Path(directory)
             repo = self._repo(root)
             lock = json.loads((repo / "redot-api.lock.json").read_text())
-            lock["redot"]["version_string"] = "26.3.stable.official.test"
-            lock["godot_api"]["version_minor"] = 6
+            lock["binding_abi"]["redot"]["version_string"] = "26.3.stable.official.test"
+            lock["binding_abi"]["godot_api"]["version_minor"] = 6
+            api = repo / "extension_api.json"
+            document = json.loads(api.read_text())
+            document["header"]["version_minor"] = 6
+            api.write_text(json.dumps(document))
+            from tests.test_api_identity import sha256
+            lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(api)
             alternate = repo / "alternate.lock.json"
             alternate.write_text(json.dumps(lock))
             binary = root / "debug.dll"
@@ -125,7 +121,7 @@ class PackagingTests(unittest.TestCase):
                     patch("tools.package_release.subprocess.run", return_value=subprocess.CompletedProcess([], 0, "a" * 40)), \
                     patch("tools.package_release.third_party_bundle", return_value={}):
                 result = create_package(repo, "windows-x86_64", binary, binary, root / "output", lock_path=alternate)
-            self.assertEqual(result["manifest"]["redot"]["version"], lock["redot"]["version_string"])
+            self.assertEqual(result["manifest"]["binding_abi"]["redot"]["version_string"], lock["binding_abi"]["redot"]["version_string"])
             with zipfile.ZipFile(root / "output" / result["archive"]) as archive:
                 self.assertEqual(json.loads(archive.read("addons/redot-rust-compat/redot-api.lock.json")), lock)
                 descriptor = archive.read("addons/redot-rust-compat/redot_rust_smoke.gdextension").decode()

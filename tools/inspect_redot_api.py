@@ -16,6 +16,8 @@ if __package__ in (None, ""):
 
 from tools.redot_api import (  # noqa: E402
     IdentityError,
+    binding_abi,
+    engine_profile,
     inspect_api,
     load_lock,
     resolve_locked_path,
@@ -37,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lock", type=Path, default=Path("redot-api.lock.json"))
     parser.add_argument("--api", type=Path)
+    parser.add_argument("--engine-profile", help="inspect the raw dump of this certified engine; otherwise inspect binding input")
+    parser.add_argument("--target", help="platform identity for supplied engine binaries")
     parser.add_argument("--interface-header", type=Path)
     parser.add_argument("--editor", type=Path)
     parser.add_argument("--launcher", type=Path)
@@ -51,7 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         lock_path = args.lock.resolve()
         lock = load_lock(lock_path)
-        api = args.api or _locked_optional(lock_path, lock, "files", "extension_api", "path")
+        identity = binding_abi(lock) if args.engine_profile is None else engine_profile(lock, args.engine_profile)[1]
+        api = args.api or _locked_optional(lock_path, identity, "files", "extension_api", "path")
         if api is None:
             raise IdentityError("files.extension_api.path: required field is missing")
         if args.api_only and any(
@@ -66,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
                 None if args.api_only else args.interface_header
                 or _locked_optional(
                     lock_path,
-                    lock,
+                    identity,
                     "files",
                     "gdextension_interface_header",
                     "path",
@@ -74,13 +79,13 @@ def main(argv: list[str] | None = None) -> int:
             ),
             editor_path=(
                 None if args.api_only else args.editor
-                or _locked_optional(lock_path, lock, "binaries", "editor", "path")
+
             ),
+            engine_profile_name=args.engine_profile,
+            target_name=args.target,
             launcher_path=(
                 None if args.api_only else args.launcher
-                or _locked_optional(
-                    lock_path, lock, "binaries", "console_launcher", "path"
-                )
+
             ),
         )
     except IdentityError as error:

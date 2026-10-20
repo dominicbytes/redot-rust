@@ -22,14 +22,14 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.dependency_report import DependencyReportError, third_party_bundle  # noqa: E402
-from tools.redot_api import sha256_file  # noqa: E402
+from tools.redot_api import binding_abi, binding_identity, inspect_api, load_lock, resolve_locked_path, sha256_file  # noqa: E402
 from tools.verify_binary_deps import (  # noqa: E402
     BinaryAuditError,
     audit_binary,
 )
 
 
-VERSION = "0.1.0+redot.26.2.1"
+VERSION = "0.2.0"
 ADDON_ROOT = PurePosixPath("addons/redot-rust-compat")
 MANIFEST_NAME = str(ADDON_ROOT / "package-manifest.json")
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
@@ -69,6 +69,7 @@ DOCUMENTS = {
     "redot-api.lock.json": ADDON_ROOT / "redot-api.lock.json",
     "docs/compatibility.md": ADDON_ROOT / "docs/compatibility.md",
     "docs/limitations.md": ADDON_ROOT / "docs/limitations.md",
+    "docs/lock-schema.md": ADDON_ROOT / "docs/lock-schema.md",
 }
 
 SOURCE_REPOSITORY = "https://github.com/dominicbytes/redot-rust"
@@ -114,7 +115,7 @@ def _zip_info(name: str) -> zipfile.ZipInfo:
 def _gdextension(target: dict[str, Any], lock: dict[str, Any]) -> bytes:
     debug_path = ADDON_ROOT / "bin" / target["debug_name"]
     release_path = ADDON_ROOT / "bin" / target["release_name"]
-    api = lock["godot_api"]
+    api = binding_abi(lock)["godot_api"]
     minimum = f'{api["version_major"]}.{api["version_minor"]}'
     text = (
         '[configuration]\n\n'
@@ -355,13 +356,14 @@ def create_package(
     version: str = VERSION,
     cargo: str = "cargo",
     lock_path: Path | None = None,
+    api_path: Path | None = None,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     if target_name not in TARGETS:
         raise PackageError(f"unsupported target: {target_name}")
     target = TARGETS[target_name]
     lock_path = lock_path.resolve() if lock_path else repo_root / "redot-api.lock.json"
-    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    lock = load_lock(lock_path)
     revision_result = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True,
         text=True, timeout=30, check=False,
@@ -386,6 +388,9 @@ def create_package(
     failed = [profile for profile, audit in audits.items() if audit["status"] != "PASS"]
     if failed:
         raise PackageError(f"binary audit failed for profile(s): {', '.join(failed)}")
+
+    api_path = api_path or resolve_locked_path(lock_path, binding_abi(lock)["files"]["extension_api"]["path"])
+    inspect_api(api_path, lock)
 
     payload: dict[str, bytes] = {}
     for source_name, archive_name in DOCUMENTS.items():
@@ -413,27 +418,14 @@ def create_package(
         for name in sorted(payload)
     ]
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "name": "redot-rust-compat",
         "version": version,
         "target": target_name,
         "source": source_locator,
-        "redot": {
-            "version": lock["redot"]["version_string"],
-            "engine_commit": lock["redot"]["engine_commit"],
-            "api_sha256": lock["files"]["extension_api"]["sha256"],
-            "godot_api": (
-                f'{lock["godot_api"]["version_major"]}.'
-                f'{lock["godot_api"]["version_minor"]}.'
-                f'{lock["godot_api"]["version_patch"]}'
-            ),
-            "precision": lock["redot"]["precision"],
-        },
-        "gdext": {
-            "revision": lock["gdext"]["revision"],
-            "crate_version": lock["gdext"]["crate_version"],
-            "entry_symbol": "gdext_rust_init",
-        },
+        "binding_abi": binding_identity(lock),
+        "certified_engines": lock["certified_engines"],
+        "coverage": binding_abi(lock)["coverage"],
         "profiles": {
             profile: {
                 "library": target[f"{profile}_name"],
@@ -464,7 +456,7 @@ def create_package(
     checksum = archive.with_suffix(archive.suffix + ".sha256")
     checksum.write_text(f"{archive_sha256}  {archive.name}\n", encoding="ascii")
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "PASS",
         "archive": archive.name,
         "archive_sha256": archive_sha256,
@@ -489,6 +481,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", default=VERSION)
     parser.add_argument("--cargo", default="cargo")
     parser.add_argument("--lock", type=Path)
+    parser.add_argument("--api", type=Path, help="binding snapshot to validate before packaging")
     args = parser.parse_args(argv)
     try:
         report = create_package(
@@ -499,7 +492,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output_dir,
             version=args.version,
             cargo=args.cargo,
-            lock_path=args.lock,
+            lock_path=args.lock, api_path=args.api,
         )
     except (BinaryAuditError, DependencyReportError, PackageError, OSError, ValueError,
             subprocess.TimeoutExpired) as error:

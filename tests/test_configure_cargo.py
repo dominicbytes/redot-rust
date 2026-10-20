@@ -23,32 +23,8 @@ class ConfigureCargoTests(unittest.TestCase):
         self.api_path.parent.mkdir()
         self.api_path.write_bytes(FIXTURE.read_bytes())
         digest = hashlib.sha256(self.api_path.read_bytes()).hexdigest().upper()
-        lock = {
-            "schema_version": 1,
-            "redot": {
-                "version_major": 26,
-                "version_minor": 2,
-                "version_patch": 0,
-                "version_status": "stable",
-                "version_build": "official",
-                "precision": "single",
-            },
-            "godot_api": {
-                "version_major": 4,
-                "version_minor": 5,
-                "version_patch": 2,
-                "version_status": "stable",
-                "version_build": "redot.official",
-                "precision": "single",
-                "supported_minor_min": 2,
-                "supported_minor_max": 7,
-            },
-            "target": {"precision": "single", "build": "editor"},
-            "files": {
-                "extension_api": {"path": str(self.api_path), "sha256": digest},
-                "gdextension_interface_json": {"available": False},
-            },
-        }
+        from tests.test_api_identity import make_lock
+        lock = make_lock(self.api_path)
         self.lock_path = self.root / "redot-api.lock.json"
         self.lock_path.write_text(json.dumps(lock), encoding="utf-8")
 
@@ -71,7 +47,8 @@ class ConfigureCargoTests(unittest.TestCase):
 
     def _interface_lock(self, **values: object) -> None:
         lock = json.loads(self.lock_path.read_text())
-        lock["files"]["gdextension_interface_json"] = values
+        lock["binding_abi"]["files"]["gdextension_interface_json"] = values
+        lock["binding_abi"]["interface_mode"] = "explicit" if values.get("mode") == "explicit" else "pinned-gdext-bundled"
         self.lock_path.write_text(json.dumps(lock))
 
     def test_bundled_lock_rejects_interface_override(self) -> None:
@@ -155,7 +132,7 @@ class ConfigureCargoTests(unittest.TestCase):
         import tomllib
         value = tomllib.loads(example.read_text())["env"]["GDRUST_GODOT_API_JSON"]["value"]
         lock = json.loads((example.parents[1] / "redot-api.lock.json").read_text())
-        locked_value = lock["files"]["extension_api"]["path"]
+        locked_value = lock["binding_abi"]["files"]["extension_api"]["path"]
         self.assertEqual(value, locked_value)
         self.assertEqual(Path(result.stdout.strip()).resolve(), (repo / locked_value).resolve())
 

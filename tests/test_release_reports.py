@@ -29,7 +29,7 @@ class ReleaseReportTests(unittest.TestCase):
             "license_file": True,
             "cargo_lock": True,
         }
-        report = build_sync_report(lock, candidate, [])
+        report = build_sync_report({"binding_abi": lock}, candidate, [])
         self.assertEqual(report["status"], "PASS")
         self.assertFalse(report["applied"])
         self.assertEqual(set(report["impact"].values()), {"none"})

@@ -20,6 +20,8 @@ if __package__ in (None, ""):
 
 from tools.redot_api import (  # noqa: E402
     IdentityError,
+    binding_abi,
+    binding_identity,
     inspect_api,
     load_lock,
     resolve_locked_path,
@@ -95,7 +97,9 @@ def prepare_environment(
         environment.pop(key, None)
     environment["GDRUST_GODOT_API_JSON"] = str(api_path)
 
-    interface_lock = lock.get("files", {}).get("gdextension_interface_json", {})
+    environment["REDOT_RUST_BINDING_ABI"] = json.dumps(binding_identity(lock), sort_keys=True, separators=(",", ":"))
+    report["binding_abi"] = binding_identity(lock)
+    interface_lock = binding_abi(lock).get("files", {}).get("gdextension_interface_json", {})
     mode = interface_lock.get("mode")
     if mode is None and interface_lock.get("available") is False:
         mode = "bundled"
@@ -141,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         lock = load_lock(lock_path)
         api_path = args.api
         if api_path is None:
-            api_value = lock.get("files", {}).get("extension_api", {}).get("path")
+            api_value = binding_abi(lock).get("files", {}).get("extension_api", {}).get("path")
             if not isinstance(api_value, str):
                 raise IdentityError("files.extension_api.path: required field is missing")
             api_path = resolve_locked_path(lock_path, api_value)

@@ -67,7 +67,7 @@ def build_sync_report(
     candidate: dict[str, Any],
     patch_files: list[str],
 ) -> dict[str, Any]:
-    current = lock["gdext"]["revision"]
+    current = lock["binding_abi"]["gdext"]["revision"]
     same_revision = candidate["revision"] == current
     failures = []
     if not candidate["source_clean"]:

@@ -28,8 +28,12 @@ class InstallerSecurityTests(unittest.TestCase):
     def archive(self, payload=None, *, compression=zipfile.ZIP_STORED):
         if payload is None:
             payload = [(str(ADDON_ROOT / "payload.txt"), b"verified")]
+        lock = json.loads((Path(__file__).parents[1] / "redot-api.lock.json").read_text())
         manifest = {
-            "schema_version": 1,
+            "binding_abi": lock["binding_abi"],
+            "certified_engines": lock["certified_engines"],
+            "coverage": lock["binding_abi"]["coverage"],
+            "schema_version": 2,
             "name": "redot-rust-compat",
             "target": "windows-x86_64",
             "version": "test",

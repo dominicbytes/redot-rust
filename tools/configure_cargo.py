@@ -9,9 +9,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -22,6 +23,7 @@ from tools.redot_api import (  # noqa: E402
     inspect_api,
     load_lock,
     resolve_locked_path,
+    sha256_file,
 )
 
 
@@ -34,28 +36,92 @@ GDEXT_ENV_KEYS = (
 )
 
 
+def build_targets(environment: Mapping[str, str], command: Sequence[str]) -> list[str]:
+    """Return the Cargo targets selected by `--target` arguments or the environment."""
+    targets = []
+    for index, argument in enumerate(command):
+        if argument == "--target" and index + 1 < len(command):
+            targets.append(command[index + 1])
+        elif argument.startswith("--target="):
+            targets.append(argument.split("=", 1)[1])
+    if not targets and environment.get("CARGO_BUILD_TARGET"):
+        targets.append(environment["CARGO_BUILD_TARGET"])
+    return targets
+
+
+def remap_environment(
+    base_environment: Mapping[str, str], repo_root: Path, command: Sequence[str] = ()
+) -> dict[str, str]:
+    """Keep Cargo's flag precedence and encode paths containing spaces safely."""
+    environment = dict(base_environment)
+    encoded = environment.get("CARGO_ENCODED_RUSTFLAGS")
+    flags = encoded.split("\x1f") if encoded else []
+    if encoded is None:
+        # Cargo splits RUSTFLAGS on whitespace, without shell quote processing.
+        flags = environment.get("RUSTFLAGS", "").split()
+    roots = {
+        repo_root.resolve(): "__source",
+        Path(environment.get("CARGO_HOME", Path.home() / ".cargo")).resolve(): "__cargo",
+        Path(environment.get("RUSTUP_HOME", Path.home() / ".rustup")).resolve(): "__rustup",
+        Path(environment.get("CARGO_TARGET_DIR", repo_root / "target")).resolve(): "__target",
+    }
+    # Rust uses the last matching mapping; give the most specific root priority.
+    for root, replacement in sorted(roots.items(), key=lambda item: len(str(item[0]))):
+        for spelling in sorted({str(root), root.as_posix()}):
+            flags.append(f"--remap-path-prefix={spelling}={replacement}")
+    # The MSVC linker argument breaks every other linker, so add it only when
+    # every selected target (or the host, without one) uses MSVC.
+    targets = build_targets(environment, command)
+    if all(target.endswith("-msvc") for target in targets) if targets else sys.platform == "win32":
+        flags.extend(["-C", "link-arg=/PDBALTPATH:%_PDB%"])
+    environment["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(flags)
+    return environment
+
+
 def prepare_environment(
     lock_path: Path,
     api_path: Path,
     interface_json: Path | None,
     base_environment: Mapping[str, str],
+    command: Sequence[str] = (),
 ) -> tuple[dict[str, str], dict]:
     lock_path = lock_path.resolve()
     api_path = api_path.resolve()
     lock = load_lock(lock_path)
     report = inspect_api(api_path, lock)
 
-    environment = dict(base_environment)
+    environment = remap_environment(base_environment, Path(__file__).resolve().parents[1], command)
     for key in GDEXT_ENV_KEYS:
         environment.pop(key, None)
     environment["GDRUST_GODOT_API_JSON"] = str(api_path)
 
+    interface_lock = lock.get("files", {}).get("gdextension_interface_json", {})
+    mode = interface_lock.get("mode")
+    if mode is None and interface_lock.get("available") is False:
+        mode = "bundled"
+    if mode not in {"bundled", "explicit"}:
+        raise IdentityError("files.gdextension_interface_json.mode: expected bundled or explicit")
+    report["interface"] = {"mode": mode}
+    if mode == "explicit" and interface_json is None:
+        raise IdentityError("explicit interface mode requires --interface-json")
     if interface_json is not None:
+        if mode != "explicit":
+            raise IdentityError("interface override is forbidden by bundled-only lock")
+        expected_hash = interface_lock.get("sha256")
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[a-fA-F0-9]{64}", expected_hash):
+            raise IdentityError("files.gdextension_interface_json.sha256: required SHA-256 is missing")
         interface_json = interface_json.resolve()
         if not interface_json.is_file():
-            raise IdentityError(
-                f"GDRUST_GODOT_INTERFACE_JSON: file does not exist: {interface_json}"
-            )
+            raise IdentityError("GDRUST_GODOT_INTERFACE_JSON: file does not exist")
+        actual_hash = sha256_file(interface_json)
+        if actual_hash != expected_hash.upper():
+            raise IdentityError("files.gdextension_interface_json.sha256: lock is stale")
+        try:
+            json.loads(interface_json.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as error:
+            raise IdentityError("interface: invalid JSON") from error
+        report["interface"]["sha256"] = actual_hash
+        report["companion_sha256"]["gdextension_interface_json"] = actual_hash
         environment["GDRUST_GODOT_INTERFACE_JSON"] = str(interface_json)
 
     return environment, report
@@ -80,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise IdentityError("files.extension_api.path: required field is missing")
             api_path = resolve_locked_path(lock_path, api_value)
         environment, report = prepare_environment(
-            lock_path, api_path, args.interface_json, os.environ
+            lock_path, api_path, args.interface_json, os.environ, args.command
         )
     except IdentityError as error:
         print(f"FAIL: {error}", file=sys.stderr)

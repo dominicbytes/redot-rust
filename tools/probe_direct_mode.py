@@ -24,13 +24,15 @@ from tools.redot_api import IdentityError, load_lock, sha256_file  # noqa: E402
 EXPECTED_FAILURE = "Only Godot major version 4 is supported"
 
 
-def evaluate_direct_probe(returncode: int, combined_output: str) -> tuple[str, list[str]]:
+def evaluate_direct_probe(
+    returncode: int, combined_output: str, expected_version: str
+) -> tuple[str, list[str]]:
     failures: list[str] = []
     if returncode == 0:
         failures.append("direct mode unexpectedly succeeded")
     if EXPECTED_FAILURE not in combined_output:
         failures.append("expected Godot-major rejection was not observed")
-    if "26.2.stable.official.4f5b14aba" not in combined_output:
+    if not expected_version or expected_version not in combined_output:
         failures.append("locked Redot product version was not present in the rejection")
     return ("PASS" if not failures else "FAIL", failures)
 
@@ -127,7 +129,9 @@ def run_probe(
         },
     )
     (report_dir / "cargo-direct-mode.log").write_text(sanitized, encoding="utf-8")
-    status, failures = evaluate_direct_probe(returncode, sanitized)
+    status, failures = evaluate_direct_probe(
+        returncode, sanitized, lock["redot"]["version_string"]
+    )
     if timed_out:
         failures.append("direct-mode probe timed out")
         status = "FAIL"

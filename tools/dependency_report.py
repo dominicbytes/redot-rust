@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -58,6 +59,105 @@ def normalize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         "packages": packages,
         "missing_licenses": missing_licenses,
     }
+
+
+def linked_packages(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    """Follow normal target dependencies, excluding host-only procedural macros."""
+    packages = {row["id"]: row for row in metadata["packages"]}
+    nodes = {row["id"]: row for row in metadata["resolve"]["nodes"]}
+    pending = [member for member in metadata["workspace_members"]
+               if any("cdylib" in target["kind"] for target in packages[member]["targets"])]
+    if not pending:
+        raise DependencyReportError("no workspace cdylib found in Cargo metadata")
+    visited = set()
+    while pending:
+        package_id = pending.pop()
+        if package_id in visited:
+            continue
+        package = packages[package_id]
+        if any("proc-macro" in target["kind"] for target in package["targets"]):
+            continue
+        visited.add(package_id)
+        for dependency in nodes[package_id]["deps"]:
+            if any(kind["kind"] is None for kind in dependency["dep_kinds"]):
+                pending.append(dependency["pkg"])
+    return sorted((packages[key] for key in visited), key=lambda row: (row["name"], row["version"]))
+
+
+def cached_license_files(package: dict[str, Any]) -> dict[str, bytes]:
+    """Read notices from this exact registry package or its git workspace root."""
+    root = Path(package["manifest_path"]).parent
+    directories = [root]
+    if str(package.get("source", "")).startswith("git+"):
+        for parent in [root, *root.parents]:
+            if (parent / ".git").exists():
+                if parent != root:
+                    directories.append(parent)
+                break
+        else:
+            raise DependencyReportError(f"cached git checkout missing for {package['name']}")
+    files = {}
+    for directory in directories:
+        for path in sorted(directory.iterdir()):
+            if path.is_file() and re.match(r"^(?:licen[cs]e|copying|notice|copyright)(?:[._-]|$)", path.name, re.I):
+                files.setdefault(path.name, path.read_bytes())
+    declared = package.get("license_file")
+    if declared:
+        path = root / declared
+        files[path.name] = path.read_bytes()
+    has_license_text = declared or any(
+        re.match(r"^(?:licen[cs]e|copying)(?:[._-]|$)", name, re.I) for name in files
+    )
+    if not has_license_text or (not package.get("license") and not declared):
+        raise DependencyReportError(f"cached license material missing for {package['name']}")
+    return files
+
+
+def third_party_bundle(
+    repo_root: Path, targets: tuple[str, ...], cargo: str = "cargo"
+) -> dict[str, bytes]:
+    """Resolve the locked target graphs offline and ship their linked notices."""
+    def read_metadata(target: str | None = None) -> dict[str, Any]:
+        command = [str(cargo), "metadata", "--locked", "--offline", "--format-version", "1"]
+        if target is not None:
+            command.extend(["--filter-platform", target])
+        completed = subprocess.run(
+            command, cwd=repo_root, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=180, check=False,
+        )
+        if completed.returncode:
+            raise DependencyReportError("offline Cargo metadata failed")
+        return json.loads(completed.stdout)
+
+    # The inventory covers every locked package, including other platforms;
+    # only notice selection is restricted to the package's target graphs.
+    inventory = normalize_metadata(read_metadata())["packages"]
+    linked = {}
+    for target in targets:
+        metadata = read_metadata(target)
+        for package in linked_packages(metadata):
+            if package["id"] not in metadata["workspace_members"]:
+                linked[(package["name"], package["version"], package["source"])] = package
+    payload = {}
+    linked_rows = []
+    for key, package in sorted(linked.items()):
+        directory = f"third-party/{package['name']}-{package['version']}"
+        texts = cached_license_files(package)
+        for name, data in texts.items():
+            payload[f"{directory}/{name}"] = data
+        linked_rows.append({
+            "name": package["name"], "version": package["version"],
+            "source": package["source"], "license": package.get("license"),
+            "notices": [f"{directory}/{name}" for name in sorted(texts)],
+        })
+    report = {
+        "schema_version": 1, "targets": list(targets),
+        "scope": "normal target dependency closure; excludes build, dev and procedural macro dependencies",
+        "linked_packages": linked_rows,
+        "locked_packages": inventory,
+    }
+    payload["dependency-inventory.json"] = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    return payload
 
 
 def dependency_report(

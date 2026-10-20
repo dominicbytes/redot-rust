@@ -15,3 +15,5 @@ assert(smoke.add_and_emit(20, 22) == 42)
 ```
 
 This archive supports only its manifest target and the exact Redot/API lock included beside it. See `docs/compatibility.md` and `docs/limitations.md` inside the add-on.
+
+See `NOTICE.md`, `SOURCE.json`, and `package-manifest.json` for the public source repository and corresponding source revision. `dependency-inventory.json` distinguishes linked dependencies from build-only packages; `third-party/` contains the linked crates' license and notice texts.

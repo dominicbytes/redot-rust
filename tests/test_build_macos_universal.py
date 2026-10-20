@@ -4,6 +4,7 @@
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from unittest.mock import patch
 
@@ -49,7 +50,21 @@ class BuildMacosUniversalTests(unittest.TestCase):
             self.assertIn("universal2-apple-darwin", text)
             self.assertIn("--release", text)
             self.assertIn(":/workspace:ro", text)
-            self.assertIn(":/api:ro", text)
+            self.assertIn(f"{api.resolve()}:/api/extension_api.json:ro", command)
+
+    def test_renamed_validated_api_is_the_only_mounted_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            api = root / "renamed-locked-api.json"
+            api.write_text("locked")
+            (root / "extension_api.json").write_text("unchecked sibling")
+            with patch.dict("os.environ", {"CARGO_ENCODED_RUSTFLAGS": "--cfg\x1fcustom"}):
+                command = docker_command(root, api, root / "output", "debug")
+            self.assertIn(f"{api.resolve()}:/api/extension_api.json:ro", command)
+            flags = next(value for value in command if value.startswith("CARGO_ENCODED_RUSTFLAGS="))
+            self.assertTrue(flags.startswith("CARGO_ENCODED_RUSTFLAGS=--cfg\x1fcustom\x1f"))
+            for source in ("/workspace", "/output/target", "/output/cargo-home", "/root", "/usr/local/rustup"):
+                self.assertIn(f"--remap-path-prefix={source}=", flags)
 
     def test_rejects_unknown_profile(self) -> None:
         with self.assertRaisesRegex(MacBuildError, "unsupported profile"):

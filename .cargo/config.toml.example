@@ -1,9 +1,10 @@
 # Copy only when an environment-based adapter cannot be used.
-# Paths are relative to this `.cargo` directory; do not replace them with
+# Paths are relative to the repository root containing `.cargo`; do not use
 # machine-specific absolute paths in tracked files.
 
 [env]
-GDRUST_GODOT_API_JSON = { value = "../../api/redot-26.2/4f5b14aba-single-windows-x86_64/extension_api.json", relative = true }
+GDRUST_GODOT_API_JSON = { value = "../api/redot-26.2/4f5b14aba-single-windows-x86_64/extension_api.json", relative = true }
 
-# The installed Redot 26.2 build does not expose interface JSON generation.
-# Leave GDRUST_GODOT_INTERFACE_JSON unset so pinned gdext uses its bundled data.
+# Match this API path to files.extension_api.path in the selected lock.
+# For a bundled interface profile, leave GDRUST_GODOT_INTERFACE_JSON unset.
+# Use tools/configure_cargo.py for lock validation and publication-safe builds.

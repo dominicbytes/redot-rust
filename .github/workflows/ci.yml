@@ -24,6 +24,7 @@ jobs:
         run: |
           rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
           rustup default 1.94.0
+          cargo fetch --locked
 
       - name: Download and verify Redot 26.2
         shell: pwsh
@@ -99,6 +100,7 @@ jobs:
         run: |
           rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
           rustup default 1.94.0
+          cargo fetch --locked
 
       - name: Download and verify Redot 26.2
         run: |
@@ -165,6 +167,7 @@ jobs:
           rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
           rustup default 1.94.0
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          cargo fetch --locked
 
       - name: Download and verify Redot 26.2
         run: |

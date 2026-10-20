@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.redot_api import IdentityError, inspect_api, load_lock  # noqa: E402
+from tools.package_release import PackageError, _validate_payload  # noqa: E402
 from tools.verify_binary_deps import BinaryAuditError, audit_binary  # noqa: E402
 
 
@@ -52,7 +54,7 @@ def docker_command(
         "aarch64-apple-darwin x86_64-apple-darwin && "
         "GDRUST_GODOT_API_JSON=/api/extension_api.json "
         "CARGO_HOME=/output/cargo-home CARGO_TARGET_DIR=/output/target "
-        "cargo +1.94.0 zigbuild --locked --workspace "
+        "cargo +1.94.0 zigbuild --locked --workspace -j 4 "
         f"--target universal2-apple-darwin{release}"
     )
     return [
@@ -62,9 +64,21 @@ def docker_command(
         "-v",
         f"{repo_root.resolve()}:/workspace:ro",
         "-v",
-        f"{api_path.resolve().parent}:/api:ro",
+        f"{api_path.resolve()}:/api/extension_api.json:ro",
         "-v",
         f"{output_dir.resolve()}:/output",
+        "-e",
+        "CARGO_ENCODED_RUSTFLAGS=" + "\x1f".join(
+            (os.environ["CARGO_ENCODED_RUSTFLAGS"].split("\x1f")
+             if "CARGO_ENCODED_RUSTFLAGS" in os.environ
+             else os.environ.get("RUSTFLAGS", "").split())
+            + [f"--remap-path-prefix={root}={replacement}" for root, replacement in (
+                ("/workspace", "__source"), ("/output", "__output"),
+                ("/output/cargo-home", "__cargo"), ("/output/target", "__target"),
+                ("/root", "__home"), ("/usr/local/cargo", "__cargo"),
+                ("/usr/local/rustup", "__rustup"),
+            )]
+        ),
         "-w",
         "/workspace",
         image,
@@ -112,6 +126,7 @@ def build_macos_universal(
         destination = output_dir / "bin" / OUTPUT_NAMES[profile]
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+        _validate_payload(destination.name, destination.read_bytes())
         binaries[profile] = audit_binary(
             destination,
             expected_architectures={"arm64", "x86_64"},
@@ -166,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             image=args.image,
             timeout=args.timeout,
         )
-    except (BinaryAuditError, IdentityError, MacBuildError, OSError) as error:
+    except (BinaryAuditError, IdentityError, MacBuildError, PackageError, OSError) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))

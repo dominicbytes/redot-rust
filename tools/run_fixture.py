@@ -17,7 +17,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
-from tools.scan_redot_log import scan_text  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
 
 EDITOR_MARKERS = (
@@ -63,32 +63,87 @@ def evaluate_initialization(
     return failures
 
 
+# Exit zero also signals Redot's frame cap; require the fixture's own quit path.
+RUNTIME_SUCCESS_EXIT = 42
+ASSERTION_SCHEMA_VERSION = 1
+SMOKE_ASSERTIONS = frozenset({
+    "class_visible", "resource_class_visible", "tool_class_visible", "method",
+    "property", "signal", "lifecycle_ready", "identity", "build_profile",
+    "init_stages", "enum", "array", "dictionary", "variant",
+    "rust_to_gdscript_callable", "resource_apply", "resource_inspector",
+    "resource_round_trip", "editor_tool", "worker_started", "worker_handoff",
+})
+CLEAN_ASSERTIONS = frozenset({
+    "class_visible", "instance", "method", "signal", "identity", "lifecycle",
+    "build_profile",
+})
+CONSUMER_ASSERTIONS = frozenset({
+    "project_selects_rapier", "server_class_registered", "factory_class_registered",
+    "active_server_is_rapier", "body_rid_valid", "body_uses_active_space",
+    "server_reported_active_objects", "rigid_body_fell", "rigid_body_resting_on_floor",
+})
+EXPECTED_ASSERTIONS = {
+    "smoke": SMOKE_ASSERTIONS, "clean-install": CLEAN_ASSERTIONS,
+    "consumer": CONSUMER_ASSERTIONS, "exported-smoke": SMOKE_ASSERTIONS,
+    "exported-clean-install": CLEAN_ASSERTIONS,
+}
+
+
+def evaluate_result(
+    result: object, fixture_type: str, *, expected_dimension: str = "2d",
+) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(result, dict):
+        return ["fixture result JSON is missing or is not an object"]
+    if result.get("status") != "PASS":
+        failures.append(f"fixture status is {result.get('status')!r}")
+    if type(result.get("assertion_schema_version")) is not int or result.get(
+        "assertion_schema_version"
+    ) != ASSERTION_SCHEMA_VERSION:
+        failures.append("unsupported or missing assertion schema version")
+    expected_type = fixture_type.removeprefix("exported-")
+    if result.get("fixture_type") != expected_type:
+        failures.append(f"fixture type does not match {expected_type}")
+    frames = result.get("frames")
+    if type(frames) is not int or frames < 2:
+        failures.append(f"fixture ran {frames} frame(s); at least 2 are required")
+    assertions = result.get("assertions")
+    if not isinstance(assertions, dict):
+        failures.append("fixture assertions object is missing")
+    else:
+        expected = EXPECTED_ASSERTIONS[fixture_type]
+        missing = expected - assertions.keys()
+        unknown = assertions.keys() - expected
+        if missing:
+            failures.append("missing assertions: " + ", ".join(sorted(missing)))
+        if unknown:
+            failures.append("unknown assertions: " + ", ".join(sorted(unknown)))
+        for name, passed in assertions.items():
+            if passed is not True:
+                failures.append(f"assertion failed: {name}")
+    if fixture_type == "consumer":
+        if result.get("dimension") != expected_dimension:
+            failures.append(f"consumer dimension does not match {expected_dimension}")
+        if result.get("active_server_class") != f"RapierPhysicsServer{expected_dimension.upper()}":
+            failures.append("consumer active server class does not match expected dimension")
+    return failures
+
+
 def evaluate_run(
     returncode: int,
     timed_out: bool,
     result: dict[str, Any] | None,
     findings: list[dict[str, object]],
+    *,
+    fixture_type: str = "smoke",
+    expected_dimension: str = "2d",
 ) -> list[str]:
     failures: list[str] = []
-    if returncode != 0:
-        failures.append(f"process exit code {returncode}")
+    if returncode != RUNTIME_SUCCESS_EXIT:
+        failures.append(f"process exit code {returncode}; fixture completion requires {RUNTIME_SUCCESS_EXIT}")
     if timed_out:
         failures.append("wall-clock timeout")
-    if result is None:
-        failures.append("fixture result JSON is missing")
-    else:
-        if result.get("status") != "PASS":
-            failures.append(f"fixture status is {result.get('status')!r}")
-        frames = result.get("frames")
-        if not isinstance(frames, int) or frames < 2:
-            failures.append(f"fixture ran {frames} frame(s); at least 2 are required")
-        assertions = result.get("assertions")
-        if not isinstance(assertions, dict):
-            failures.append("fixture assertions object is missing")
-        else:
-            for name, passed in assertions.items():
-                if passed is not True:
-                    failures.append(f"assertion failed: {name}")
+    failures.extend(evaluate_result(result, fixture_type, expected_dimension=expected_dimension))
     for finding in findings:
         failures.append(f"log {finding['severity']}: {finding['line']}")
     return failures
@@ -130,6 +185,11 @@ def run_fixture(
         raise ValueError("quit_after must be at least 2")
     project_dir = project_dir.resolve()
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({
+        project_dir: "<PROJECT_ROOT>",
+        redot_bin.resolve().parent: "<ENGINE_ROOT>",
+        report_dir: "<EVIDENCE_ROOT>",
+    })
     result_path = project_dir / ".results" / "fixture-result.json"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     if result_path.exists():
@@ -143,6 +203,8 @@ def run_fixture(
         initialization_command = [
             str(resolved.editor),
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--editor",
             "--path",
             str(project_dir),
@@ -155,10 +217,9 @@ def run_fixture(
         init_log = init_stdout + (
             "\n" if init_stdout and init_stderr else ""
         ) + init_stderr
-        (report_dir / "redot-editor-init.log").write_text(
-            init_log, encoding="utf-8"
-        )
-        init_findings = scan_text(init_log)
+        init_findings = scan_text(init_log, sanitizer=sanitizer)
+        init_log = sanitizer.text(init_log)
+        sanitizer.write_text(report_dir / "redot-editor-init.log", init_log)
         initialization_failures = evaluate_initialization(
             init_code, init_timeout, init_findings
         )
@@ -169,6 +230,8 @@ def run_fixture(
             "command": [
                 "<REDOT_EDITOR>",
                 "--headless",
+                "--audio-driver",
+                "Dummy",
                 "--editor",
                 "--path",
                 "<PROJECT_ROOT>",
@@ -191,15 +254,14 @@ def run_fixture(
                 "findings": [],
                 "failures": initialization_failures,
             }
-            (report_dir / "run-report.json").write_text(
-                json.dumps(report, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+            report = sanitizer.finish(report_dir, "run-report.json", report)
             return report
 
     command = [
         str(resolved.editor),
         "--headless",
+        "--audio-driver",
+        "Dummy",
         "--path",
         str(project_dir),
         "--quit-after",
@@ -207,8 +269,10 @@ def run_fixture(
     ]
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-runtime.log").write_text(combined, encoding="utf-8")
-    (report_dir / "redot.log").write_text(combined, encoding="utf-8")
+    findings = scan_text(combined, sanitizer=sanitizer)
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-runtime.log", combined)
+    sanitizer.write_text(report_dir / "redot.log", combined)
 
     result = None
     if result_path.is_file():
@@ -216,7 +280,6 @@ def run_fixture(
             result = json.loads(result_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
-    findings = scan_text(combined)
     failures = evaluate_run(returncode, timed_out, result, findings)
     failures.extend(evaluate_markers(combined, RUNTIME_MARKERS, "runtime"))
     report = {
@@ -225,6 +288,8 @@ def run_fixture(
         "command": [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             "<PROJECT_ROOT>",
             "--quit-after",
@@ -237,9 +302,7 @@ def run_fixture(
         "markers": {marker: marker in combined for marker in RUNTIME_MARKERS},
         "failures": failures,
     }
-    (report_dir / "run-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "run-report.json", report)
     return report
 
 
@@ -262,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
             initialize=not args.skip_initialize,
         )
     except (DumpError, OSError, ValueError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

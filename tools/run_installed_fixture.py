@@ -25,7 +25,7 @@ from tools.run_fixture import (  # noqa: E402
     evaluate_markers,
     evaluate_run,
 )
-from tools.scan_redot_log import scan_text  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
 
 class InstalledFixtureError(RuntimeError):
@@ -46,6 +46,10 @@ def run_installed_fixture(
     if not (project / "project.godot").is_file():
         raise InstalledFixtureError(f"not a Redot project: {project}")
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({
+        project: "<PROJECT_ROOT>", report_dir: "<EVIDENCE_ROOT>",
+        **({redot_bin.resolve().parent: "<ENGINE_ROOT>"} if redot_bin else {}),
+    })
     report_dir.mkdir(parents=True, exist_ok=True)
     result_path = report_dir / "installed-fixture-result.json"
     if result_path.exists():
@@ -63,6 +67,8 @@ def run_installed_fixture(
         initialization_command = [
             str(editor),
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--editor",
             "--path",
             str(project),
@@ -72,6 +78,8 @@ def run_installed_fixture(
         sanitized_initialization = [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--editor",
             "--path",
             "<PROJECT_ROOT>",
@@ -81,6 +89,8 @@ def run_installed_fixture(
         command = [
             str(editor),
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             str(project),
             "--quit-after",
@@ -91,6 +101,8 @@ def run_installed_fixture(
         sanitized = [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             "<PROJECT_ROOT>",
             "--quit-after",
@@ -113,7 +125,7 @@ def run_installed_fixture(
         init_script = (
             f"cp /editor/{linux_editor.name} /tmp/redot-editor && "
             "chmod +x /tmp/redot-editor && "
-            "/tmp/redot-editor --headless --editor --path /project --quit-after 120"
+            "/tmp/redot-editor --headless --audio-driver Dummy --editor --path /project --quit-after 120"
         )
         initialization_command = [
             "docker",
@@ -139,7 +151,7 @@ def run_installed_fixture(
         script = (
             f"cp /templates/{linux_template.name} /tmp/redot && "
             "chmod +x /tmp/redot && "
-            "/tmp/redot --headless --path /project --quit-after 120 -- "
+            "/tmp/redot --headless --audio-driver Dummy --path /project --quit-after 120 -- "
             "--redot-rust-result=/results/installed-fixture-result.json"
         )
         command = [
@@ -171,10 +183,9 @@ def run_installed_fixture(
     init_combined = init_stdout + (
         "\n" if init_stdout and init_stderr else ""
     ) + init_stderr
-    (report_dir / "redot-installed-editor-init.log").write_text(
-        init_combined, encoding="utf-8"
-    )
-    init_findings = scan_text(init_combined)
+    init_findings = scan_text(init_combined, sanitizer=sanitizer)
+    init_combined = sanitizer.text(init_combined)
+    sanitizer.write_text(report_dir / "redot-installed-editor-init.log", init_combined)
     init_failures = evaluate_initialization(
         init_code, init_timed_out, init_findings
     )
@@ -197,22 +208,21 @@ def run_installed_fixture(
             "runtime": None,
             "failures": init_failures,
         }
-        (report_dir / "installed-run-report.json").write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        report = sanitizer.finish(report_dir, "installed-run-report.json", report)
         return report
 
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-installed-runtime.log").write_text(combined, encoding="utf-8")
+    findings = scan_text(combined, sanitizer=sanitizer)
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-installed-runtime.log", combined)
     result = None
     if result_path.is_file():
         try:
             result = json.loads(result_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
-    findings = scan_text(combined)
-    failures = evaluate_run(returncode, timed_out, result, findings)
+    failures = evaluate_run(returncode, timed_out, result, findings, fixture_type="clean-install")
     failures.extend(
         f"installed runtime marker is missing: {marker}"
         for marker in RUNTIME_MARKERS
@@ -233,9 +243,7 @@ def run_installed_fixture(
         "findings": findings,
         "failures": failures,
     }
-    (report_dir / "installed-run-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "installed-run-report.json", report)
     return report
 
 
@@ -260,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout=args.timeout,
         )
     except (DumpError, InstalledFixtureError, OSError, ValueError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

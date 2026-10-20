@@ -13,7 +13,8 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+from urllib.parse import unquote, urlsplit
 
 
 RULES = (
@@ -30,11 +31,35 @@ RULES = (
 )
 
 
-# Exclude URI and placeholder suffixes while recognizing drive, UNC and POSIX roots.
+# Exclude placeholder suffixes, including JSON-escaped backslashes, from path matches.
 ABSOLUTE_PATH = re.compile(
-    r"(?<![\w])(?:[A-Za-z]:[\\/]|\\\\)[^\r\n\"'<>|]*"
+    r"(?:(?<![\w])[A-Za-z]:[\\/]|(?<![\w<>\\])\\\\)[^\r\n\"'<>|]*"
     r"|(?<![\w:/<>])/(?![/\s])[^\r\n\"'<>|]*"
 )
+
+
+URI = re.compile(
+    r"\b(?:file:(?:(?!(?:https?|res|user)://)[^\r\n\"'<>|])*"
+    r"|(?:https?|res|user)://[^\s\"'<>|]+)", re.I,
+)
+
+
+def _contains_path(value: str) -> bool:
+    if any(match.group().lower().startswith("file:") for match in URI.finditer(value)):
+        return True
+    return bool(ABSOLUTE_PATH.search(URI.sub("", value)))
+
+
+def _json_strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from _json_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _json_strings(item)
 
 
 class EvidenceSanitizer:
@@ -59,6 +84,31 @@ class EvidenceSanitizer:
         )
 
     def text(self, value: str) -> str:
+        parts = []
+        end = 0
+        for match in URI.finditer(value):
+            parts.append(self._paths(value[end:match.start()]))
+            uri = match.group()
+            if uri.lower().startswith("file:"):
+                try:
+                    trailing = uri[len(uri.rstrip()):]
+                    parsed = urlsplit(uri.rstrip())
+                    local = unquote(parsed.path)
+                    if parsed.netloc and parsed.netloc.lower() != "localhost":
+                        local = "\\\\" + unquote(parsed.netloc) + local
+                    local = re.sub(r"^/([A-Za-z]:[\\/])", r"\1", local)
+                    uri = self._paths(local)
+                    if uri == local:
+                        uri = "<ABSOLUTE_PATH>"
+                    uri += trailing
+                except ValueError:
+                    uri = "<ABSOLUTE_PATH>"
+            parts.append(uri)
+            end = match.end()
+        parts.append(self._paths(value[end:]))
+        return "".join(parts)
+
+    def _paths(self, value: str) -> str:
         for root, placeholder in self.roots:
             pattern = re.escape(root).replace("/", r"[\\/]")
             value = re.sub(pattern, lambda _match: placeholder, value, flags=re.I)
@@ -78,8 +128,21 @@ class EvidenceSanitizer:
 
     def write_json(self, path: Path, value: Any) -> Any:
         value = self.data(value)
-        self.write_text(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
+        # Sanitize before serialization so JSON escaping remains valid.
+        path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return value
+
+    def _sanitize_file(self, path: Path) -> None:
+        value = path.read_text(encoding="utf-8", errors="replace")
+        if path.suffix.lower() == ".json":
+            try:
+                decoded = json.loads(value)
+            except json.JSONDecodeError:
+                pass
+            else:
+                self.write_json(path, decoded)
+                return
+        self.write_text(path, value)
 
     def finish(
         self, directory: Path, filename: str, report: dict[str, Any],
@@ -87,7 +150,7 @@ class EvidenceSanitizer:
         report = self.data(report)
         # Result JSON is engine-written, so it must pass the same sanitizer too.
         for path in directory.rglob("*.json"):
-            self.write_text(path, path.read_text(encoding="utf-8", errors="replace"))
+            self._sanitize_file(path)
         self.write_json(directory / filename, report)
         if scan_evidence(directory):
             report["status"] = "FAIL"
@@ -95,7 +158,7 @@ class EvidenceSanitizer:
             # Scrub textual evidence even on an always-upload failure path.
             for path in directory.rglob("*"):
                 if path.is_file() and path.suffix in (".log", ".json", ".md", ".txt"):
-                    self.write_text(path, path.read_text(encoding="utf-8", errors="replace"))
+                    self._sanitize_file(path)
             self.write_json(directory / filename, report)
         return report
 
@@ -106,9 +169,16 @@ def scan_evidence(directory: Path) -> list[str]:
     for path in directory.rglob("*"):
         if path.is_file():
             payload = path.read_bytes()
-            if any(ABSOLUTE_PATH.search(payload.decode(encoding, errors="replace"))
-                   for encoding in ("utf-8", "utf-16-le", "utf-16-be")):
-                failures.append("absolute path in evidence file")
+            for encoding in ("utf-8", "utf-16-le", "utf-16-be"):
+                text = payload.decode(encoding, errors="replace")
+                strings = [text]
+                try:
+                    strings.extend(_json_strings(json.loads(text)))
+                except json.JSONDecodeError:
+                    pass
+                if any(_contains_path(value) for value in strings):
+                    failures.append("absolute path in evidence file")
+                    break
     return failures
 
 

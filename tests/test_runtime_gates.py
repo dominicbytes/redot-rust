@@ -76,6 +76,109 @@ class RuntimeGateRegressionTests(unittest.TestCase):
 
 
 class EvidencePrivacyTests(unittest.TestCase):
+    def test_file_uris_map_known_roots_and_redact_unknown_paths(self):
+        sanitizer = EvidenceSanitizer({
+            "/fictional/project": "<PROJECT_ROOT>",
+            "Q:/fictional/project": "<PROJECT_ROOT>",
+        })
+        for uri in ("file:///fictional/project/main.gd",
+                    "file://localhost/fictional/project/main.gd",
+                    "file:///Q:/fictional/project/main.gd",
+                    "file:/Q:/fictional/project/main.gd"):
+            with self.subTest(uri=uri):
+                self.assertEqual(sanitizer.text(uri), "<PROJECT_ROOT>/main.gd")
+        for uri in ("file:///home/fictional/private/main.gd",
+                    "file:///Users/fictional/private folder/main.gd",
+                    "file://localhost/Users/fictional/private%20folder/main.gd",
+                    "file:///Q:/fictional/private/main.gd"):
+            with self.subTest(uri=uri):
+                self.assertEqual(sanitizer.text(uri), "<ABSOLUTE_PATH>")
+                findings = scan_text(uri + ": ERROR: failed to load", sanitizer=sanitizer)
+                self.assertEqual([item["severity"] for item in findings], ["error"])
+                self.assertNotIn("fictional", json.dumps(findings))
+        public = "https://example.org/fictional/project/main.gd res://main.gd user://data.json"
+        self.assertEqual(sanitizer.text(public), public)
+        self.assertEqual(sanitizer.text("file:///fictional/private/main.gd " + public),
+                         "<ABSOLUTE_PATH> " + public)
+
+    def test_final_scan_detects_file_uris_and_preserves_public_uris(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "diagnostic.log"
+            for uri in ("file:///home/fictional/private/main.gd",
+                        "file:///Users/fictional/private folder/main.gd",
+                        "file://localhost/fictional/private/main.gd"):
+                with self.subTest(uri=uri):
+                    path.write_text("ERROR: " + uri, encoding="utf-8")
+                    self.assertTrue(scan_evidence(root))
+            path.write_text("https://example.org/path res://main.gd user://data.json", encoding="utf-8")
+            self.assertEqual(scan_evidence(root), [])
+
+    def test_escaped_json_keys_and_nested_values_are_scanned_and_sanitized(self):
+        escaped_path = r"\u0051:\u002ffictional\u002fprivate\u002fmain.gd"
+        for payload in ('{"nested": [{"path": "' + escaped_path + '"}]}',
+                        '{"' + escaped_path + '": {"safe": true}}'):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / "engine-result.json"
+                path.write_text(payload, encoding="utf-8")
+                self.assertTrue(scan_evidence(root))
+                report = EvidenceSanitizer().finish(root, "report.json", {"status": "PASS"})
+                self.assertEqual(report["status"], "PASS")
+                sanitized = json.loads(path.read_text(encoding="utf-8"))
+                self.assertIn("<ABSOLUTE_PATH>", json.dumps(sanitized))
+                self.assertNotIn("fictional", json.dumps(sanitized))
+                self.assertEqual(scan_evidence(root), [])
+
+    def test_json_placeholder_backslash_suffix_remains_valid_and_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "report.json"
+            sanitizer = EvidenceSanitizer({"Q:/fictional/project": "<PROJECT_ROOT>"})
+            sanitizer.write_json(path, {"path": "Q:\\fictional\\project\\main.gd"})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")),
+                             {"path": "<PROJECT_ROOT>\\main.gd"})
+            self.assertEqual(scan_evidence(root), [])
+
+    def test_failure_evidence_is_safe_for_always_upload(self):
+        uri = "file:///Users/fictional/private folder/main.gd"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "unhandled.log").write_text("ERROR: " + uri, encoding="utf-8")
+            (root / "engine-result.json").write_text(
+                r'{"path": "\u0051:\u002ffictional\u002fprivate\u002fmain.gd"}',
+                encoding="utf-8",
+            )
+            self.assertTrue(scan_evidence(root))
+            report = EvidenceSanitizer().finish(root, "report.json", {
+                "status": "FAIL", "failures": ["log error: " + uri],
+            })
+            self.assertEqual(report["status"], "FAIL")
+            self.assertEqual(scan_evidence(root), [])
+            for path in root.iterdir():
+                self.assertNotIn("fictional", path.read_text(encoding="utf-8"))
+
+    def test_runtime_file_uri_failure_sanitizes_engine_json_and_logs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            project.mkdir()
+            def process(command, timeout):
+                result = result_for("smoke")
+                result["detail"] = "file:///Users/fictional/private folder/main.gd"
+                encoded = json.dumps(result).replace("file:", r"\u0066ile:")
+                (project / ".results" / "fixture-result.json").write_text(encoded)
+                return 42, False, "\n".join(RUNTIME_MARKERS) + "\nERROR: " + result["detail"], ""
+            with patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
+                "tools.run_fixture._run_process", side_effect=process
+            ):
+                report = run_fixture(project, root / "engine", root / "evidence", initialize=False)
+            self.assertEqual(report["status"], "FAIL")
+            self.assertEqual([item["severity"] for item in report["findings"]], ["error"])
+            self.assertEqual(scan_evidence(root / "evidence"), [])
+            for path in (root / "evidence").iterdir():
+                self.assertNotIn("fictional", path.read_text(encoding="utf-8"))
+
     def test_known_roots_and_unknown_absolute_paths_are_sanitized(self):
         sanitizer = EvidenceSanitizer({
             "/fictional/project": "<PROJECT_ROOT>", "/fictional/engine": "<ENGINE_ROOT>",

@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -18,6 +19,7 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.dependency_report import DependencyReportError, third_party_bundle  # noqa: E402
 from tools.redot_api import sha256_file  # noqa: E402
 from tools.verify_binary_deps import (  # noqa: E402
     BinaryAuditError,
@@ -33,6 +35,7 @@ ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 TARGETS = {
     "windows-x86_64": {
         "architectures": {"x86_64"},
+        "cargo_targets": ("x86_64-pc-windows-msvc",),
         "debug_name": "redot_rust_smoke.windows.template_debug.x86_64.dll",
         "release_name": "redot_rust_smoke.windows.template_release.x86_64.dll",
         "debug_key": "windows.debug.x86_64",
@@ -40,6 +43,7 @@ TARGETS = {
     },
     "linux-x86_64": {
         "architectures": {"x86_64"},
+        "cargo_targets": ("x86_64-unknown-linux-gnu",),
         "debug_name": "libredot_rust_smoke.linux.template_debug.x86_64.so",
         "release_name": "libredot_rust_smoke.linux.template_release.x86_64.so",
         "debug_key": "linux.debug.x86_64",
@@ -47,6 +51,7 @@ TARGETS = {
     },
     "macos-universal": {
         "architectures": {"arm64", "x86_64"},
+        "cargo_targets": ("aarch64-apple-darwin", "x86_64-apple-darwin"),
         "debug_name": "libredot_rust_smoke.macos.template_debug.universal.dylib",
         "release_name": "libredot_rust_smoke.macos.template_release.universal.dylib",
         "debug_key": "macos.debug",
@@ -64,9 +69,13 @@ DOCUMENTS = {
     "docs/limitations.md": ADDON_ROOT / "docs/limitations.md",
 }
 
+SOURCE_REPOSITORY = "https://github.com/dominicbytes/redot-rust"
 PRIVATE_PATH_PATTERN = re.compile(
-    rb"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/](?![\\/])|/(?:home|Users|tmp)/)"
-    rb"[^\x00\r\n\"']*"
+    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+[A-Za-z0-9_. ~-]"
+    r"|/(?:home|Users|tmp|private/tmp|var/folders|root|workspace|builds|__w|runner)/"
+    r"|/github/workspace(?:/|$)|/opt/(?:hostedtoolcache|actions-runner)/"
+    r"|/[a-z]/(?:Users|home|workspace)/"
+    r"|\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+)", re.I
 )
 
 
@@ -82,13 +91,15 @@ def _zip_info(name: str) -> zipfile.ZipInfo:
     return info
 
 
-def _gdextension(target: dict[str, Any]) -> bytes:
+def _gdextension(target: dict[str, Any], lock: dict[str, Any]) -> bytes:
     debug_path = ADDON_ROOT / "bin" / target["debug_name"]
     release_path = ADDON_ROOT / "bin" / target["release_name"]
+    api = lock["godot_api"]
+    minimum = f'{api["version_major"]}.{api["version_minor"]}'
     text = (
         '[configuration]\n\n'
         'entry_symbol = "gdext_rust_init"\n'
-        'compatibility_minimum = "4.5"\n'
+        f'compatibility_minimum = "{minimum}"\n'
         'reloadable = false\n\n'
         '[libraries]\n\n'
         f'{target["debug_key"]} = "res://{debug_path}"\n'
@@ -106,11 +117,37 @@ def _validate_payload(name: str, data: bytes) -> None:
         raise PackageError(f"restricted generated artifact in package: {name}")
     if path.suffix.casefold() in {".exe", ".tpz", ".pdb", ".lib", ".exp"}:
         raise PackageError(f"restricted build/engine artifact in package: {name}")
-    if path.suffix.casefold() in {".md", ".json", ".gdextension", ".txt"}:
-        match = PRIVATE_PATH_PATTERN.search(data)
-        if match:
-            rendered = match.group(0).decode("utf-8", errors="replace")
-            raise PackageError(f"private absolute path in {name}: {rendered}")
+    # Check every payload, including native libraries and extensionless license files.
+    native_binary = path.suffix.casefold() in {".dll", ".so", ".dylib"}
+    if native_binary:
+        # Longer printable strings may follow arbitrary data. Short strings
+        # need a NUL boundary to distinguish paths from instruction fragments.
+        texts = []
+        for match in re.finditer(rb"[\x20-\x7e]{4,}", data):
+            if len(match.group()) >= 6 or match.start() == 0 or data[match.start() - 1] == 0:
+                texts.append(match.group().decode("ascii"))
+        for offset in (0, 1):
+            decoded = data[offset:].decode("utf-16le", errors="ignore")
+            for match in re.finditer(r"[\x20-\x7e]{4,}", decoded):
+                if len(match.group()) >= 6 or match.start() == 0 or decoded[match.start() - 1] == "\0":
+                    texts.append(match.group())
+    else:
+        texts = [data.decode("latin-1")]
+        texts.extend(data[offset:].decode("utf-16le", errors="ignore") for offset in (0, 1))
+    if path.suffix.casefold() == ".json":
+        # JSON escaping must not hide a path from the publication gate.
+        def strings(value: Any) -> list[str]:
+            if isinstance(value, str):
+                return [value]
+            if isinstance(value, dict):
+                return [text for pair in value.items() for item in pair for text in strings(item)]
+            if isinstance(value, list):
+                return [text for item in value for text in strings(item)]
+            return []
+        texts.extend(strings(json.loads(data)))
+    if any(PRIVATE_PATH_PATTERN.search(text) for text in texts):
+        # Do not copy the private value into diagnostics or uploaded reports.
+        raise PackageError(f"private absolute path in {name}")
 
 
 def create_package(
@@ -121,11 +158,24 @@ def create_package(
     output_dir: Path,
     *,
     version: str = VERSION,
+    cargo: str = "cargo",
+    lock_path: Path | None = None,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     if target_name not in TARGETS:
         raise PackageError(f"unsupported target: {target_name}")
     target = TARGETS[target_name]
+    lock_path = lock_path.resolve() if lock_path else repo_root / "redot-api.lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    revision_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True,
+        text=True, timeout=30, check=False,
+    )
+    revision = revision_result.stdout.strip()
+    if revision_result.returncode or not re.fullmatch(r"[a-f0-9]{40}", revision):
+        raise PackageError("cannot determine corresponding source revision")
+    source_locator = {"repository": SOURCE_REPOSITORY, "revision": revision}
+
     audits = {
         "debug": audit_binary(
             debug_binary,
@@ -144,11 +194,16 @@ def create_package(
 
     payload: dict[str, bytes] = {}
     for source_name, archive_name in DOCUMENTS.items():
-        source = repo_root / source_name
+        source = lock_path if source_name == "redot-api.lock.json" else repo_root / source_name
         if not source.is_file():
             raise PackageError(f"required package document is missing: {source_name}")
         payload[str(archive_name)] = source.read_bytes()
-    payload[str(ADDON_ROOT / "redot_rust_smoke.gdextension")] = _gdextension(target)
+    for name, data in third_party_bundle(repo_root, target["cargo_targets"], cargo).items():
+        payload[str(ADDON_ROOT / name)] = data
+    payload[str(ADDON_ROOT / "SOURCE.json")] = (
+        json.dumps(source_locator, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    payload[str(ADDON_ROOT / "redot_rust_smoke.gdextension")] = _gdextension(target, lock)
     payload[str(ADDON_ROOT / "bin" / target["debug_name"])] = debug_binary.read_bytes()
     payload[str(ADDON_ROOT / "bin" / target["release_name"])] = release_binary.read_bytes()
 
@@ -162,12 +217,12 @@ def create_package(
         }
         for name in sorted(payload)
     ]
-    lock = json.loads((repo_root / "redot-api.lock.json").read_text(encoding="utf-8"))
     manifest = {
         "schema_version": 1,
         "name": "redot-rust-compat",
         "version": version,
         "target": target_name,
+        "source": source_locator,
         "redot": {
             "version": lock["redot"]["version_string"],
             "engine_commit": lock["redot"]["engine_commit"],
@@ -237,6 +292,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-binary", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--version", default=VERSION)
+    parser.add_argument("--cargo", default="cargo")
+    parser.add_argument("--lock", type=Path)
     args = parser.parse_args(argv)
     try:
         report = create_package(
@@ -246,8 +303,11 @@ def main(argv: list[str] | None = None) -> int:
             args.release_binary,
             args.output_dir,
             version=args.version,
+            cargo=args.cargo,
+            lock_path=args.lock,
         )
-    except (BinaryAuditError, PackageError, OSError, ValueError, json.JSONDecodeError) as error:
+    except (BinaryAuditError, DependencyReportError, PackageError, OSError, ValueError,
+            subprocess.TimeoutExpired) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))

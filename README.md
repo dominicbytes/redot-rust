@@ -1,6 +1,6 @@
 # Redot Rust Compatibility
 
-`redot-rust-compat` is the pinned build, validation, packaging, and test path for Rust GDExtensions on Redot 26.2. It keeps Redot's product version (`26.2`) separate from the compatible Godot API identity (`4.5.2`) and uses `godot-rust/gdext` JSON mode without a fork.
+`redot-rust-compat` is the pinned build, validation, packaging, and test path for Rust GDExtensions on the exact official Redot 26.2 and 26.3 engines in the lock. It builds against the unchanged 26.2 binding snapshot (Godot API `4.5.2`, single precision), records runtime certification separately, and uses `godot-rust/gdext` JSON mode without a fork.
 
 The repository includes:
 
@@ -16,19 +16,23 @@ The repository includes:
 
 | Component | Locked value |
 |---|---|
-| Redot | `26.2.stable.official.4f5b14aba` |
-| Redot engine commit | `4f5b14abade2239104847d03d8f9056e4467cfcd` |
+| Binding-origin Redot | `26.2.stable.official.4f5b14aba` |
+| Certified engine profiles | `redot-26.2` and `redot-26.3` |
+| Binding-origin engine commit | `4f5b14abade2239104847d03d8f9056e4467cfcd` |
 | Compatible Godot API | `4.5.2`, single precision |
 | `extension_api.json` SHA-256 | `177E7796166929B2193C9CCE2FD32F59601A0147D0D1E7FE904B94E8F69F6577` |
 | gdext | `0.5.5` at `637cef73172bba23850131acd8583b0c72ebf0c7` |
 | Rust | `1.94.0` |
-| Candidate version | `0.1.0+redot.26.2.1` |
+| Candidate version | `0.2.0` |
 
-Windows x86-64 and Linux x86-64 debug/release builds, editor loads, runtime fixtures, exports, binary audits, and clean-install flows are locally proven. macOS universal debug/release builds, unsigned exports, bundle inventories, static binary audits, target archives, and clean installations are also locally proven; native source and clean-installed project execution are configured in CI. Native macOS exported-app execution remains unverified and has no CI gate, so a green workflow alone does not establish full three-platform export support. See [compatibility](docs/compatibility.md) and [limitations](docs/limitations.md).
+The generated surface excludes **Struct**, 26.3-only enum values and 26.3-only classes. Raw 26.3 API dumps are audit inputs; do not use them to generate bindings with this pin. The official Windows 26.3 editor requires a visible, narrowly scoped shutdown-leak exception after completed initialization. Runtime, installed and exported runs retain strict diagnostic gates.
+
+Windows debug/release smoke and clean-install runtime checks pass on both profiles. Complete 26.2 qualification passes; official 26.3 release editor initialization can exit abnormally and remains a failing gate. Its independently passing release runtime is not a full editor qualification. The six native CI lanes are configured for Windows x86-64, Linux x86-64 and macOS universal, each against both engines; hosted execution remains pending. No current CI job exports or launches exported applications. Historical 0.1 evidence does not qualify the 0.2 candidate. See [compatibility](docs/compatibility.md), [limitations](docs/limitations.md) and [schema v2](docs/lock-schema.md).
 
 ## Prerequisites
 
-- the exact Redot 26.2 editor and export templates;
+- the exact official binding-origin Redot 26.2 editor and a selected certified runtime editor;
+- matching export templates when exercising exports;
 - Rust/Cargo 1.94.0;
 - Python 3.11 or newer;
 - Docker for Linux runtime checks from a Windows host;
@@ -41,7 +45,9 @@ The generated API and engine binaries are intentionally not distributed.
 Run these commands from the repository root. Set the editor and Cargo paths for the current shell:
 
 ```powershell
-$env:REDOT_BIN = "<path-to-redot-editor>"
+$env:BINDING_REDOT_BIN = "<official-26.2-editor>"
+$env:REDOT_BIN = "<selected-official-editor>"
+$EngineProfile = "redot-26.3"
 $Cargo = "<path-to-rust-1.94-cargo>"
 ```
 
@@ -49,7 +55,7 @@ Reproduce and validate the locked API artifacts:
 
 ```powershell
 python tools\dump_redot_api.py `
-  --redot-bin $env:REDOT_BIN `
+  --redot-bin $env:BINDING_REDOT_BIN --binding `
   --output-dir build\api `
   --lock redot-api.lock.json
 
@@ -57,9 +63,16 @@ python tools\inspect_redot_api.py --lock redot-api.lock.json `
   --api build\api\extension_api.json --api-only
 ```
 
-The dump command validates the API, C interface header, editor, and launcher against the lock. The inspector above rechecks only the generated API; it does not use the lock's default companion paths. Keep generated artifacts in `build/api/`.
+The binding dump validates the API, C interface header, editor and launcher against the binding-origin engine. Keep generation input in `build/api/`. To inspect the selected runtime engine independently:
 
-Build through the adapter so Cargo receives only the validated JSON path:
+```powershell
+python tools\dump_redot_api.py --redot-bin $env:REDOT_BIN `
+  --engine-profile $EngineProfile --output-dir build\engine-api
+```
+
+`tools/fetch_engine.py --binding` or `--engine-profile <profile>` downloads a checksum-locked official editor; supply `--target <target> --output-dir <download-dir>`. The archive and every locked executable are checked before use.
+
+Build through the adapter so Cargo receives validated JSON and the compile-time binding identity:
 
 ```powershell
 python tools\configure_cargo.py --lock redot-api.lock.json `
@@ -79,7 +92,7 @@ python tools\stage_extension.py `
   --project-dir fixtures\redot-project
 
 python tools\run_fixture.py fixtures\redot-project `
-  --redot-bin $env:REDOT_BIN `
+  --redot-bin $env:REDOT_BIN --engine-profile $EngineProfile `
   --report-dir reports\local-smoke
 ```
 
@@ -126,7 +139,7 @@ The Rapier proof applies a workspace-level `[patch.crates-io]` to this exact gde
 Create a target archive after both profile binaries exist:
 
 ```powershell
-python tools\package_release.py `
+python tools\package_release.py --api build\api\extension_api.json `
   --target windows-x86_64 `
   --debug-binary <debug-dll> `
   --release-binary <release-dll> `
@@ -140,6 +153,21 @@ python tools\install_package.py `
   dist\<archive>.zip `
   <clean-redot-project> `
   --target windows-x86_64
+```
+
+The v2 manifest includes the binding ABI, both certified engine identities and the coverage restriction. Each target archive contains both library build profiles and serves both certified engines.
+
+For a clean fixture, run editor initialization separately and preserve its cache proof before strict installed execution:
+
+```powershell
+python tools\run_fixture.py <clean-fixture> --initialize-only `
+  --redot-bin $env:REDOT_BIN --engine-profile $EngineProfile `
+  --report-dir reports\local-smoke\clean-import
+python tools\run_installed_fixture.py --project <clean-fixture> `
+  --target windows-x86_64 --redot-bin $env:REDOT_BIN `
+  --engine-profile $EngineProfile --skip-initialize `
+  --import-report reports\local-smoke\clean-import\run-report.json `
+  --report-dir reports\local-smoke\clean-runtime
 ```
 
 The archive installs a test add-on under `addons/redot-rust-compat/`. It is evidence that the build contract works; application-specific Rust source remains in the consuming project.

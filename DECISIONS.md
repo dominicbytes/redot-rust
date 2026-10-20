@@ -89,3 +89,16 @@
 - Alternatives considered: one all-platform archive; raw binary drops; installers that overwrite existing add-ons.
 - Consequences: target packages are independently auditable and safely installable, while consumers still compile their own application-specific Rust source.
 - Evidence: `tools/package_release.py`, `tools/install_package.py`, and `tests/test_packaging.py`.
+
+## ADR-0015: Separate binding ABI from certified runtime engines
+
+- Date: 2026-10-20
+- Status: accepted for candidate 0.2.0; native Linux/macOS and hosted gates pending.
+- Context: The unchanged 26.2 snapshot initializes on official 26.3, while raw 26.3 generation fails in pinned gdext. Struct generation and the engine's missing Struct Variant converters are separate blockers. One identity cannot truthfully describe both generation and runtime provenance.
+- Decision: Require schema v2 with `binding_abi` and exact `certified_engines` profiles. Keep the 26.2 API/header hashes, gdext pin and toolchain unchanged. Reject legacy v1 and mixed shapes explicitly because v1 cannot express independent runtime selection. Build/package validation selects binding input; dump/inspect/run validation selects an engine profile. Embed compile-time binding identity in the smoke extension and compare actual runtime version dictionaries with the selected profile. Use v2 manifests and assertion schema 2, retaining completion exit 42.
+- Coverage: No Struct builtin, 26.3-only typed enum values or 26.3-only classes. New physics enum members do not become supported merely because existing physics signatures match.
+- Official-engine exception: Only the exact official Windows 26.3 editor may accept the seven measured shutdown-leak lines, only at exit zero after completed scan/layout, all stage/tool markers and fresh caches. Record `engine_import_exception` visibly. Unknown diagnostics, abnormal exits, other engines/platforms, runtime, installed and exported runs remain strict. A clean-installed runtime consumes a separate import proof only after identity/marker/cache-hash checks. Remove the exception when an official engine containing the shutdown fix is pinned.
+- Alternatives considered: replace the binding snapshot with raw 26.3; filter raw dumps; duplicate single-engine locks; allow broad diagnostic substrings; certify patched local engines under official profiles. These lose provenance or fail generator/engine initialization gates.
+- Future route: Raw-26.3 bindings require a pinned Struct-capable binding revision and an engine with working GDExtension Struct converters, followed by complete native, value/lifetime, install and export qualification. That route is outside 0.2.0.
+- Consequences: The same generated ABI can be qualified against multiple exact engines without expanding coverage. Six native CI lanes derive official assets from the lock. Supporting multiple profiles here does not change a downstream plugin's one-engine-per-release policy or certify its physics behavior. Engine/API artifacts remain undistributed.
+- Contract: `redot-api.lock.json`, `docs/lock-schema.md`, `compat/redot-26.3-import-allowlist.json` and `.github/workflows/ci.yml`.

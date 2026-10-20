@@ -134,6 +134,7 @@ def build_macos_universal(
             destination,
             expected_architectures={"arm64", "x86_64"},
             expected_target="macos-universal",
+            exact_exports=True,
         )
         if binaries[profile]["status"] != "PASS":
             raise MacBuildError(

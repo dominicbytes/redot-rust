@@ -378,11 +378,13 @@ def create_package(
             debug_binary,
             expected_architectures=target["architectures"],
             expected_target=target_name,
+            exact_exports=True,
         ),
         "release": audit_binary(
             release_binary,
             expected_architectures=target["architectures"],
             expected_target=target_name,
+            exact_exports=True,
         ),
     }
     failed = [profile for profile, audit in audits.items() if audit["status"] != "PASS"]

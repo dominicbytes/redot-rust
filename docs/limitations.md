@@ -70,6 +70,12 @@ engine binaries/templates, raw API dumps, generated bindings, source caches,
 debug symbols, credentials and private paths. V1 locks/manifests require
 explicit migration; mixed identity shapes are rejected.
 
+The binary audit's dependency allowlist covers pure-Rust libraries. A consumer
+that compiles C or C++ code may import further UCRT API sets (for example stdio
+or convert) or other libraries; each needs an explicit allowlist change. The
+smoke audits and packages run with exact exports; consumers opt in with
+`--exact-exports`.
+
 The historical Rapier 0.8.40 proof is not qualification of the newer physics
 fork. Adopting the shared lock and tooling does not fix or certify downstream
 physics, unsafe callbacks, deterministic replay, performance or export flows.

@@ -75,7 +75,7 @@ class CiWorkflowTests(unittest.TestCase):
             commands = [line for line in job.splitlines() if "tools/verify_binary_deps.py " in line]
             self.assertEqual(len(commands), 2)
             for command in commands:
-                self.assertIn("--target " + target + " ", command)
+                self.assertIn("--target " + target + " --exact-exports ", command)
                 self.assertIn("${{ matrix.engine_profile }}", command)
 
     @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")

@@ -97,6 +97,7 @@ def verify_export(
             binary_audit = audit_binary(
                 audit_path,
                 expected_architectures=set(target["architectures"]),
+                expected_target=target_name,
             )
         library_hash = hashlib.sha256(library_data).hexdigest().upper()
         library_size = len(library_data)
@@ -118,6 +119,7 @@ def verify_export(
         binary_audit = audit_binary(
             library_path,
             expected_architectures=set(target["architectures"]),
+            expected_target=target_name,
         )
         library_hash = sha256_file(library_path)
         library_size = library_path.stat().st_size

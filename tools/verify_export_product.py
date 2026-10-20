@@ -21,6 +21,7 @@ if __package__ in (None, ""):
 
 from tools.package_release import TARGETS  # noqa: E402
 from tools.redot_api import sha256_file  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer  # noqa: E402
 from tools.verify_binary_deps import BinaryAuditError, audit_binary  # noqa: E402
 
 
@@ -178,13 +179,13 @@ def main(argv: list[str] | None = None) -> int:
             expected_library=args.expected_library,
         )
     except (BinaryAuditError, ExportProductError, OSError, zipfile.BadZipFile) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
+    sanitizer = EvidenceSanitizer()
+    report = sanitizer.data(report)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        report = sanitizer.finish(args.report.parent, args.report.name, report)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2
 

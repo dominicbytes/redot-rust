@@ -57,6 +57,8 @@ func _finish() -> void:
 			result_path = argument.trim_prefix("--redot-rust-result=")
 	var passed := _failures.is_empty()
 	var payload := {
+		"assertion_schema_version": 1,
+		"fixture_type": "clean-install",
 		"status": "PASS" if passed else "FAIL",
 		"frames": _frames,
 		"assertions": _assertions,
@@ -70,4 +72,4 @@ func _finish() -> void:
 	file.store_string(JSON.stringify(payload, "\t"))
 	file.close()
 	print("REDOT_RUST_CLEAN_RESULT status=%s frames=%d" % [payload.status, _frames])
-	get_tree().quit(0 if passed else 1)
+	get_tree().quit(42 if passed else 1)

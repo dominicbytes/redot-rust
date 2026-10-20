@@ -18,8 +18,8 @@ if __package__ in (None, ""):
 
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
 from tools.redot_api import sha256_file  # noqa: E402
-from tools.run_fixture import _run_process, evaluate_initialization  # noqa: E402
-from tools.scan_redot_log import scan_text  # noqa: E402
+from tools.run_fixture import _run_process, evaluate_initialization, evaluate_run  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
 
 ENGINE_MARKER = "PHYSICS ENGINE 2D: Rapier2D v0.8.40"
@@ -89,32 +89,13 @@ def evaluate_consumer_result(
     findings: list[dict[str, object]],
     log_text: str,
 ) -> list[str]:
-    failures: list[str] = []
-    if returncode != 0:
-        failures.append(f"process exit code {returncode}")
-    if timed_out:
-        failures.append("wall-clock timeout")
+    failures = evaluate_run(
+        returncode, timed_out, result, findings, fixture_type="consumer"
+    )
     if ENGINE_MARKER not in log_text:
         failures.append(f"runtime marker is missing: {ENGINE_MARKER}")
     if RESULT_MARKER not in log_text:
         failures.append(f"runtime marker is missing: {RESULT_MARKER}")
-    if result is None:
-        failures.append("consumer result JSON is missing")
-    else:
-        if result.get("status") != "PASS":
-            failures.append(f"consumer status is {result.get('status')!r}")
-        frames = result.get("frames")
-        if not isinstance(frames, int) or frames < 2:
-            failures.append(f"consumer ran {frames} frame(s); at least 2 are required")
-        assertions = result.get("assertions")
-        if not isinstance(assertions, dict):
-            failures.append("consumer assertions object is missing")
-        else:
-            for name, passed in assertions.items():
-                if passed is not True:
-                    failures.append(f"assertion failed: {name}")
-    for finding in findings:
-        failures.append(f"log {finding['severity']}: {finding['line']}")
     return failures
 
 
@@ -132,12 +113,20 @@ def run_consumer_fixture(
         raise ValueError("quit_after must be at least 2")
     selection = materialize_consumer_fixture(source_project, output_project, library)
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({
+        output_project.resolve(): "<PROJECT_ROOT>",
+        source_project.resolve(): "<SOURCE_PROJECT_ROOT>",
+        redot_bin.resolve().parent: "<ENGINE_ROOT>",
+        report_dir: "<EVIDENCE_ROOT>",
+    })
     report_dir.mkdir(parents=True, exist_ok=True)
     resolved = resolve_dump_editor(redot_bin)
 
     init_command = [
         str(resolved.editor),
         "--headless",
+        "--audio-driver",
+        "Dummy",
         "--editor",
         "--path",
         str(output_project.resolve()),
@@ -148,8 +137,9 @@ def run_consumer_fixture(
         init_command, timeout
     )
     init_log = init_stdout + ("\n" if init_stdout and init_stderr else "") + init_stderr
-    (report_dir / "redot-editor-init.log").write_text(init_log, encoding="utf-8")
-    init_findings, init_allowed_findings = partition_findings(scan_text(init_log))
+    init_findings, init_allowed_findings = partition_findings(scan_text(init_log, sanitizer=sanitizer))
+    init_log = sanitizer.text(init_log)
+    sanitizer.write_text(report_dir / "redot-editor-init.log", init_log)
     init_failures = evaluate_initialization(init_code, init_timeout, init_findings)
     if ENGINE_MARKER not in init_log:
         init_failures.append(f"editor initialization marker is missing: {ENGINE_MARKER}")
@@ -158,6 +148,8 @@ def run_consumer_fixture(
         "command": [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--editor",
             "--path",
             "<PROJECT_ROOT>",
@@ -172,6 +164,7 @@ def run_consumer_fixture(
     }
     if init_failures:
         report = {
+            "schema_version": 1,
             "status": "FAIL",
             "selection": selection,
             "initialization": initialization,
@@ -182,15 +175,15 @@ def run_consumer_fixture(
             "findings": [],
             "failures": init_failures,
         }
-        (report_dir / "run-report.json").write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        report = sanitizer.finish(report_dir, "run-report.json", report)
         return report
 
     result_path = output_project.resolve() / ".results" / "consumer-result.json"
     command = [
         str(resolved.editor),
         "--headless",
+        "--audio-driver",
+        "Dummy",
         "--path",
         str(output_project.resolve()),
         "--fixed-fps",
@@ -200,24 +193,28 @@ def run_consumer_fixture(
     ]
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-runtime.log").write_text(combined, encoding="utf-8")
+    findings, allowed_findings = partition_findings(scan_text(combined, sanitizer=sanitizer))
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-runtime.log", combined)
     result = None
     if result_path.is_file():
         try:
             result = json.loads(result_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
-    findings, allowed_findings = partition_findings(scan_text(combined))
     failures = evaluate_consumer_result(
         returncode, timed_out, result, findings, combined
     )
     report = {
+        "schema_version": 1,
         "status": "PASS" if not failures else "FAIL",
         "selection": selection,
         "initialization": initialization,
         "command": [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             "<PROJECT_ROOT>",
             "--fixed-fps",
@@ -236,9 +233,7 @@ def run_consumer_fixture(
         },
         "failures": failures,
     }
-    (report_dir / "run-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "run-report.json", report)
     return report
 
 
@@ -263,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout=args.timeout,
         )
     except (ConsumerFixtureError, DumpError, OSError, ValueError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

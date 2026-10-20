@@ -134,6 +134,19 @@ class ImportExceptionTests(unittest.TestCase):
         self.assertTrue(result["fresh_caches_verified"])
         self.assertEqual(len(result["diagnostics"]), 7)
 
+    def test_leak_form_covers_every_official_platform_but_crashes_only_windows(self):
+        identity = self.runtime["identity"]
+        for target in ("linux-x86_64", "macos-universal"):
+            with self.subTest(target=target):
+                binaries = identity["assets"][target]["binaries"]
+                runtime = {**self.runtime, "target": target, "binary_sha256": next(iter(binaries.values()))}
+                result = self.evaluate(runtime=runtime)
+                self.assertIsNotNone(result)
+                self.assertEqual(result["form"], "shutdown-leaks")
+                self.assertIsNone(self.evaluate(self.text + "\nERROR: extra diagnostic", runtime=runtime))
+                self.assertIsNone(self.evaluate(self.crash_text(), code=3221225477, runtime=runtime))
+                self.assertIsNone(self.evaluate(code=-11, runtime=runtime))
+
     def test_extra_diagnostic_missing_marker_wrong_profile_and_runtime_fail(self):
         self.assertIsNone(self.evaluate(self.text + "\nERROR: extra diagnostic"))
         for marker in (*EDITOR_MARKERS, "[ DONE ] first_scan_filesystem", "[ DONE ] loading_editor_layout"):

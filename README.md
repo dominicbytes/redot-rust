@@ -25,7 +25,7 @@ The repository includes:
 | Rust | `1.94.0` |
 | Candidate version | `0.2.0` |
 
-The generated surface excludes **Struct**, 26.3-only enum values and 26.3-only classes. Raw 26.3 API dumps are audit inputs; do not use them to generate bindings with this pin. The official Windows 26.3 editor requires visible, narrowly scoped shutdown-leak or Windows access-violation exceptions after completed initialization. Runtime, installed and exported runs retain strict diagnostic gates.
+The generated surface excludes **Struct**, 26.3-only enum values and 26.3-only classes. Raw 26.3 API dumps are audit inputs; do not use them to generate bindings with this pin. The official 26.3 editor requires visible, narrowly scoped shutdown-leak exceptions on every platform, and Windows access-violation exceptions, after completed initialization. Runtime, installed and exported runs retain strict diagnostic gates.
 
 Windows debug/release smoke and clean-install runtime checks pass on both profiles. Editor initialization passes for both profiles, with exact, recorded exceptions for the official 26.3 shutdown defect. Independently passing runtimes do not replace editor qualification. The six native CI lanes are configured for Windows x86-64, Linux x86-64 and macOS universal, each against both engines; hosted execution remains pending. No current CI job exports or launches exported applications. Historical 0.1 evidence does not qualify the 0.2 candidate. See [compatibility](docs/compatibility.md), [limitations](docs/limitations.md) and [schema v2](docs/lock-schema.md).
 

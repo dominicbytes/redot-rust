@@ -39,7 +39,7 @@ inventory and every member's hash/size. The installer rejects legacy or mixed
 manifest shapes before extraction. A profile in the lock is a qualification
 target, not a substitute for a completed platform gate; see compatibility.md.
 
-The official Windows editor exception is visible in a separate editor-import
+The official 26.3 editor exception is visible in a separate editor-import
 report as `engine_import_exception`, with form `shutdown-leaks` or
 `shutdown-abnormal-exit`. Both require exact binary/version identity, every
 extension/tool marker, completed filesystem scan/editor layout and fresh,

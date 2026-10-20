@@ -21,10 +21,10 @@ is outside this release.
 ## Editor shutdown and iteration
 
 Use `reloadable = false` and restart after replacing a native library. Editor
-initialization allows 120 frames and a wall-clock timeout. Official Windows
-26.3 has two temporary editor-initialization exceptions, both reproduced
-without an extension. `shutdown-leaks` requires exit zero and exactly seven
-known shutdown diagnostics. `shutdown-abnormal-exit` requires only the Windows
+initialization allows 120 frames and a wall-clock timeout. Official 26.3 has
+two temporary editor-initialization exceptions, both reproduced without an
+extension. `shutdown-leaks` (Windows, Linux and macOS) requires exit zero and
+exactly seven known shutdown diagnostics. `shutdown-abnormal-exit` requires only the Windows
 access violation `3221225477` / `-1073741819` (`0xC0000005`), with the exact
 crash-handler banner/backtrace grammar in the allowlist. The handler can be
 truncated at a complete line, including after its opening 64-equals separator;

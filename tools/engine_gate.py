@@ -121,8 +121,7 @@ def evaluate_import_exception(text: str, code: int, timed_out: bool, *, lock: di
     """Never used for a runtime or export; exact engine verification precedes this call."""
     name, identity = engine_profile(lock, runtime["profile"])
     relative = identity.get("import_exception")
-    if (name != "redot-26.3" or not relative or context != "editor-import"
-            or runtime["target"] != "windows-x86_64"):
+    if name != "redot-26.3" or not relative or context != "editor-import":
         return None
     # Restrict even direct callers to editor initialization with no user payload.
     if (not any(arg in command for arg in ("--editor", "--import"))
@@ -131,6 +130,11 @@ def evaluate_import_exception(text: str, code: int, timed_out: bool, *, lock: di
                    or arg.endswith((".gd", ".tscn")) for arg in command)):
         return None
     config = json.loads((Path(__file__).resolve().parents[1] / relative).read_text())
+    # The leak form is evidenced on every official platform; the access
+    # violation form only on Windows, whose crash handler output it matches.
+    if runtime["target"] not in config["leak_targets"] or (
+            code and runtime["target"] not in config["abnormal_exit_targets"]):
+        return None
     if (runtime["version_string"] != identity["redot"]["version_string"]
             or runtime["binary_sha256"] not in identity["assets"][runtime["target"]]["binaries"].values()
             or timed_out or code not in (0, *config["abnormal_exit_codes"])):

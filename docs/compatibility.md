@@ -20,8 +20,9 @@ targets. The full archive, executable, raw API and interface identities are in
 | Linux x86-64 | Both | Native CI configured; candidate execution pending |
 | macOS universal | Both | Both architectures built/audited and native host execution configured in CI; candidate execution pending |
 
-The official Windows 26.3 editor's shutdown defect reproduces without an
-extension. Completed editor initialization may record `engine_import_exception`
+The official 26.3 editor's shutdown defect reproduces without an extension;
+the leak form is measured on Windows, Linux and macOS, the abnormal exit on
+Windows. Completed editor initialization may record `engine_import_exception`
 as `shutdown-leaks` (exit zero, exactly seven known lines) or
 `shutdown-abnormal-exit` (Windows `0xC0000005`, with only the allowlisted crash
 handler and any known shutdown lines). The handler may truncate immediately

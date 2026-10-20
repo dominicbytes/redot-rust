@@ -1,6 +1,14 @@
 {
-  "reason": "Official Windows editor shutdown leaks and access violations reproduce in an empty project.",
+  "reason": "Official editor shutdown leaks (Windows, Linux and macOS) and Windows access violations reproduce in an empty project.",
   "removal_condition": "Pin an official engine containing the shutdown fix, then remove this exception.",
+  "leak_targets": [
+    "windows-x86_64",
+    "linux-x86_64",
+    "macos-universal"
+  ],
+  "abnormal_exit_targets": [
+    "windows-x86_64"
+  ],
   "diagnostics": [
     "WARNING: 2 RIDs of type \"Canvas\" were leaked.",
     "WARNING: 29 RIDs of type \"CanvasItem\" were leaked.",

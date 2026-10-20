@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,8 @@ if __package__ in (None, ""):
 
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
 from tools.materialize_fixture import MaterializeError, materialize_fixture  # noqa: E402
-from tools.redot_api import sha256_file  # noqa: E402
+from tools.redot_api import DEFAULT_LOCK, binding_identity, load_lock, verify_engine, sha256_file
+from tools.engine_gate import fixture_arguments, evaluate_fixture_identity, verify_runtime_version  # noqa: E402
 from tools.run_fixture import (  # noqa: E402
     EDITOR_MARKERS,
     RUNTIME_MARKERS,
@@ -61,6 +63,8 @@ def run_linux_fixture(
     docker_image: str = "rust:1.94-bookworm",
     quit_after: int = 120,
     timeout: int = 120,
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
 ) -> dict[str, Any]:
     if profile not in PROFILES:
         raise LinuxFixtureError(f"unsupported profile: {profile}")
@@ -108,6 +112,8 @@ def run_linux_fixture(
     )
 
     resolved = resolve_dump_editor(redot_bin)
+    lock = load_lock(lock_path)
+    import_engine = verify_engine(resolved.editor, lock, engine_profile_name, timeout=timeout)
     init_command = [
         str(resolved.editor),
         "--headless",
@@ -149,6 +155,7 @@ def run_linux_fixture(
     }
     if init_failures:
         report = {
+            "binding_abi": binding_identity(lock), "runtime_engine": import_engine,
             "status": "FAIL",
             "selection": selection,
             "initialization": initialization,
@@ -177,6 +184,9 @@ def run_linux_fixture(
         "-c",
         script,
     ]
+    version_command = command[:-1] + [f"cp /templates/{template.name} /tmp/redot && chmod +x /tmp/redot && /tmp/redot --version"]
+    runtime_engine = verify_runtime_version(template, lock, import_engine["profile"], "linux-x86_64", version_command=version_command)
+    command[-1] += " -- " + shlex.join(fixture_arguments(lock, runtime_engine))
     returncode, timed_out, stdout, stderr = _docker_run(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
     findings = scan_text(combined, sanitizer=sanitizer)
@@ -190,6 +200,7 @@ def run_linux_fixture(
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
     failures = evaluate_run(returncode, timed_out, result, findings)
     failures.extend(evaluate_markers(combined, RUNTIME_MARKERS, "runtime"))
+    failures.extend(evaluate_fixture_identity(result, lock, runtime_engine))
     runtime = {
         "command": [
             "docker",
@@ -213,6 +224,7 @@ def run_linux_fixture(
         "markers": {marker: marker in combined for marker in RUNTIME_MARKERS},
     }
     report = {
+        "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
         "status": "PASS" if not failures else "FAIL",
         "selection": selection,
         "initialization": initialization,
@@ -234,6 +246,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--docker-image", default="rust:1.94-bookworm")
     parser.add_argument("--quit-after", type=int, default=120)
     parser.add_argument("--timeout", type=int, default=120)
+    parser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--engine-profile")
     args = parser.parse_args(argv)
     try:
         report = run_linux_fixture(
@@ -246,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
             docker_image=args.docker_image,
             quit_after=args.quit_after,
             timeout=args.timeout,
+            lock_path=args.lock, engine_profile_name=args.engine_profile,
         )
     except (DumpError, LinuxFixtureError, MaterializeError, OSError, ValueError) as error:
         print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)

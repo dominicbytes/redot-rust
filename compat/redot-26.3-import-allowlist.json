@@ -1,0 +1,13 @@
+{
+  "reason": "Official Windows editor shutdown leaks reproduce in an empty project.",
+  "removal_condition": "Pin an official engine containing the shutdown fix, then remove this exception.",
+  "diagnostics": [
+    "WARNING: 2 RIDs of type \"Canvas\" were leaked.",
+    "WARNING: 29 RIDs of type \"CanvasItem\" were leaked.",
+    "ERROR: 2 RID allocations of type 'N16RendererViewport8ViewportE' were leaked at exit.",
+    "ERROR: 14 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+    "ERROR: 100 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+    "ERROR: 1 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+    "WARNING: ObjectDB instances leaked at exit (run with --verbose for details)."
+  ]
+}

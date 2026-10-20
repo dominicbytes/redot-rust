@@ -32,7 +32,7 @@ def sha256_file(path: Path) -> str:
 DEFAULT_LOCK = Path(__file__).resolve().parents[1] / "redot-api.lock.json"
 
 
-def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result = {}
     for key, value in pairs:
         if key in result:
@@ -66,7 +66,7 @@ def validate_lock(value: dict[str, Any]) -> dict[str, Any]:
     engines = _mapping(value.get("certified_engines"), "certified_engines")
     if not engines or value.get("default_engine_profile") not in engines or binding.get("engine_profile") not in engines:
         raise IdentityError("lock: default and binding engine profiles must exist")
-    for name, identity in [("binding_abi", binding), *engines.items()]:
+    for name, identity, is_binding in [("binding_abi", binding, True), *[(key, item, False) for key, item in engines.items()]]:
         identity = _mapping(identity, name)
         redot = _mapping(identity.get("redot"), name + ".redot")
         _mapping(identity.get("godot_api"), name + ".godot_api")
@@ -92,7 +92,7 @@ def validate_lock(value: dict[str, Any]) -> dict[str, Any]:
             digest = files.get(key, {}).get("sha256", "")
             if not isinstance(digest, str) or not re.fullmatch(r"[A-Fa-f0-9]{64}", digest):
                 raise IdentityError(name + ".files." + key + ": required SHA-256 is missing")
-        if name == "binding_abi":
+        if is_binding:
             continue
         if identity.get("binding_abi") != binding["profile"]:
             raise IdentityError(name + ": unknown binding ABI")
@@ -120,7 +120,7 @@ def validate_lock(value: dict[str, Any]) -> dict[str, Any]:
 
 def load_lock(path: Path = DEFAULT_LOCK) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_json_object)
     except (OSError, json.JSONDecodeError) as error:
         raise IdentityError("lock: cannot read valid JSON") from error
     return validate_lock(value)

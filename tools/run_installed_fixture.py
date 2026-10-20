@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,8 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.redot_api import DEFAULT_LOCK, binding_identity, load_lock, verify_engine, sha256_file
+from tools.engine_gate import fixture_arguments, evaluate_fixture_identity, verify_runtime_version
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
 from tools.export_fixture import RUNTIME_MARKERS  # noqa: E402
 from tools.run_fixture import (  # noqa: E402
@@ -41,7 +44,12 @@ def run_installed_fixture(
     linux_template: Path | None = None,
     docker_image: str = "rust:1.94-bookworm",
     timeout: int = 120,
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
+    initialize: bool = True,
+    import_report: Path | None = None,
 ) -> dict[str, Any]:
+    lock = load_lock(lock_path)
     project = project.resolve()
     if not (project / "project.godot").is_file():
         raise InstalledFixtureError(f"not a Redot project: {project}")
@@ -64,6 +72,7 @@ def run_installed_fixture(
     sanitized_initialization: list[str] | None = None
     if native_host and redot_bin is not None:
         editor = resolve_dump_editor(redot_bin).editor
+        runtime_engine = verify_engine(editor, lock, engine_profile_name, target=target, timeout=timeout)
         initialization_command = [
             str(editor),
             "--headless",
@@ -122,6 +131,9 @@ def run_installed_fixture(
         if linux_template is None or not linux_template.is_file():
             raise InstalledFixtureError("a matching --linux-template is required")
         linux_editor = resolve_dump_editor(redot_bin).editor
+        version_command = ["docker", "run", "--rm", "-v", f"{linux_editor.parent}:/editor:ro", docker_image,
+                           "sh", "-c", f"cp /editor/{linux_editor.name} /tmp/redot-editor && chmod +x /tmp/redot-editor && /tmp/redot-editor --version"]
+        runtime_engine = verify_engine(linux_editor, lock, engine_profile_name, target=target, timeout=timeout, version_command=version_command)
         init_script = (
             f"cp /editor/{linux_editor.name} /tmp/redot-editor && "
             "chmod +x /tmp/redot-editor && "
@@ -177,31 +189,50 @@ def run_installed_fixture(
 
     if initialization_command is None or sanitized_initialization is None:
         raise InstalledFixtureError("clean project initialization command is missing")
-    init_code, init_timed_out, init_stdout, init_stderr = _run_process(
-        initialization_command, timeout
-    )
-    init_combined = init_stdout + (
-        "\n" if init_stdout and init_stderr else ""
-    ) + init_stderr
-    init_findings = scan_text(init_combined, sanitizer=sanitizer)
-    init_combined = sanitizer.text(init_combined)
-    sanitizer.write_text(report_dir / "redot-installed-editor-init.log", init_combined)
-    init_failures = evaluate_initialization(
-        init_code, init_timed_out, init_findings
-    )
-    init_failures.extend(
-        evaluate_markers(init_combined, EDITOR_MARKERS, "editor initialization")
-    )
+    if initialize:
+        init_code, init_timed_out, init_stdout, init_stderr = _run_process(
+            initialization_command, timeout
+        )
+        init_combined = init_stdout + (
+            "\n" if init_stdout and init_stderr else ""
+        ) + init_stderr
+        init_findings = scan_text(init_combined, sanitizer=sanitizer)
+        init_combined = sanitizer.text(init_combined)
+        sanitizer.write_text(report_dir / "redot-installed-editor-init.log", init_combined)
+        init_failures = evaluate_initialization(
+            init_code, init_timed_out, init_findings
+        )
+        init_failures.extend(
+            evaluate_markers(init_combined, EDITOR_MARKERS, "editor initialization")
+        )
+    else:
+        # Import is a separate editor gate. Installed execution never relaxes diagnostics.
+        if import_report is None:
+            raise InstalledFixtureError("--skip-initialize requires --import-report")
+        proof = json.loads(import_report.read_text(encoding="utf-8"))
+        if (proof.get("status") != "PASS" or proof.get("binding_abi") != binding_identity(lock)
+                or proof.get("runtime_engine") != runtime_engine
+                or not all(proof.get("initialization", {}).get("markers", {}).get(marker) is True for marker in EDITOR_MARKERS)):
+            raise InstalledFixtureError("separate editor import proof differs from selected identity")
+        if not all((project / ".godot" / name).is_file() for name in ("extension_list.cfg", "global_script_class_cache.cfg")):
+            raise InstalledFixtureError("separate editor import has not created the required caches")
+        expected_cache = proof.get("import_cache_sha256", {})
+        if any(expected_cache.get(name) != sha256_file(project / ".godot" / name) for name in ("extension_list.cfg", "global_script_class_cache.cfg")):
+            raise InstalledFixtureError("editor import caches differ from completed import proof")
+        init_code, init_timed_out, init_findings, init_failures, init_combined = 0, False, [], [], ""
     initialization = {
-        "command": sanitized_initialization,
+        "command": sanitized_initialization if initialize else None,
+        "mode": "strict" if initialize else "separate-verified-import",
         "returncode": init_code,
         "timed_out": init_timed_out,
         "findings": init_findings,
-        "markers": {marker: marker in init_combined for marker in EDITOR_MARKERS},
+        "markers": ({marker: marker in init_combined for marker in EDITOR_MARKERS}
+                    if initialize else proof["initialization"]["markers"]),
     }
     if init_failures:
         report = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
             "status": "FAIL",
             "target": target,
             "initialization": initialization,
@@ -211,6 +242,12 @@ def run_installed_fixture(
         report = sanitizer.finish(report_dir, "installed-run-report.json", report)
         return report
 
+    if command[0] == "docker":
+        version_command = command[:-1] + [f"cp /templates/{linux_template.name} /tmp/redot && chmod +x /tmp/redot && /tmp/redot --version"]
+        verify_runtime_version(linux_template, lock, runtime_engine["profile"], target, version_command=version_command)
+        command[-1] += " " + shlex.join(fixture_arguments(lock, runtime_engine))
+    else:
+        command += fixture_arguments(lock, runtime_engine)
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
     findings = scan_text(combined, sanitizer=sanitizer)
@@ -228,11 +265,13 @@ def run_installed_fixture(
         for marker in RUNTIME_MARKERS
         if marker not in combined
     )
+    failures.extend(evaluate_fixture_identity(result, lock, runtime_engine))
     clean_marker = "REDOT_RUST_CLEAN_RESULT status=PASS"
     if clean_marker not in combined:
         failures.append(f"installed runtime marker is missing: {clean_marker}")
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
+            "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
         "status": "PASS" if not failures else "FAIL",
         "target": target,
         "initialization": initialization,
@@ -256,6 +295,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--linux-template", type=Path)
     parser.add_argument("--docker-image", default="rust:1.94-bookworm")
     parser.add_argument("--timeout", type=int, default=120)
+    parser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--engine-profile")
+    parser.add_argument("--import-report", type=Path)
+    parser.add_argument("--skip-initialize", action="store_true", help="require caches from a separate editor import gate")
     args = parser.parse_args(argv)
     try:
         report = run_installed_fixture(
@@ -266,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
             linux_template=args.linux_template,
             docker_image=args.docker_image,
             timeout=args.timeout,
+            lock_path=args.lock, engine_profile_name=args.engine_profile,
+            initialize=not args.skip_initialize, import_report=args.import_report,
         )
     except (DumpError, InstalledFixtureError, OSError, ValueError) as error:
         print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)

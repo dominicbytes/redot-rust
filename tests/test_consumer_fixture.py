@@ -52,7 +52,7 @@ class ConsumerFixtureTests(unittest.TestCase):
 
     def test_evaluate_accepts_complete_pass(self) -> None:
         result = {
-            "assertion_schema_version": 1,
+            "assertion_schema_version": 2,
             "fixture_type": "consumer",
             "dimension": "2d",
             "active_server_class": "RapierPhysicsServer2D",

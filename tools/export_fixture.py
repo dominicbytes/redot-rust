@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import shutil
+import shlex
 import subprocess
 import sys
 import zipfile
@@ -20,7 +21,8 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
-from tools.redot_api import sha256_file  # noqa: E402
+from tools.redot_api import DEFAULT_LOCK, binding_identity, engine_profile, load_lock, verify_engine, sha256_file
+from tools.engine_gate import fixture_arguments, evaluate_fixture_identity, verify_runtime_version  # noqa: E402
 from tools.run_fixture import _run_process, evaluate_run  # noqa: E402
 from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
@@ -59,7 +61,6 @@ RESULT_MARKERS = (
     "REDOT_RUST_RESULT status=PASS",
     "REDOT_RUST_CLEAN_RESULT status=PASS",
 )
-REDOT_EXPORT_TEMPLATE_VERSION = "26.2.stable"
 MACOS_ALLOWED_EXPORT_MESSAGES = (
     "Warning: Notarization is disabled. The exported project will be blocked by Gatekeeper",
     "Code signing is disabled. The exported project will not run on Macs with enabled Gatekeeper",
@@ -158,7 +159,14 @@ def export_fixture(
     *,
     timeout: int = 180,
     docker_editor_image: str | None = None,
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
 ) -> dict[str, Any]:
+    lock = load_lock(lock_path)
+    selected, identity = engine_profile(lock, engine_profile_name)
+    redot = identity["redot"]
+    template_version = f'{redot["version_major"]}.{redot["version_minor"]}.{redot["version_status"]}'
+    template = template.resolve()
     project_dir = project_dir.resolve()
     if not (project_dir / "project.godot").is_file():
         raise ExportError(f"not a Redot project: {project_dir}")
@@ -183,19 +191,21 @@ def export_fixture(
     if docker_editor_image:
         if not redot_bin.is_file():
             raise ExportError(f"Docker editor does not exist: {redot_bin}")
+        version_command = ["docker", "run", "--rm", "-v", f"{redot_bin.resolve().parent}:/editor:ro", docker_editor_image, "sh", "-c", f"cp /editor/{redot_bin.name} /tmp/redot && chmod +x /tmp/redot && /tmp/redot --version"]
+        runtime_engine = verify_engine(redot_bin, lock, selected, target="linux-x86_64", version_command=version_command)
         install_template = ""
         if target_name == "macos-universal":
             install_template = (
                 "mkdir -p "
-                f"/root/.local/share/redot/export_templates/{REDOT_EXPORT_TEMPLATE_VERSION} && "
+                f"/root/.local/share/redot/export_templates/{template_version} && "
                 f"cp /templates/{template.name} "
                 "/root/.local/share/redot/export_templates/"
-                f"{REDOT_EXPORT_TEMPLATE_VERSION}/{template.name} && "
+                f"{template_version}/{template.name} && "
             )
         script = (
             f"cp /editor/{redot_bin.name} /tmp/redot && chmod +x /tmp/redot && "
             f"{install_template}"
-            "/tmp/redot --headless --audio-driver Dummy --path /project "
+            "/tmp/redot --headless --audio-driver Dummy --path /project --quit-after 120 --log-file /output/export-engine.log "
             f"{'--export-debug' if profile == 'debug' else '--export-release'} "
             f"'Redot Rust Compat' /output/{output.name}"
         )
@@ -226,6 +236,7 @@ def export_fixture(
         ]
     else:
         resolved = resolve_dump_editor(redot_bin)
+        runtime_engine = verify_engine(resolved.editor, lock, selected)
         command = [
             str(resolved.editor),
             "--headless",
@@ -233,6 +244,7 @@ def export_fixture(
             "Dummy",
             "--path",
             str(project_dir),
+            "--quit-after", "120",
             "--export-debug" if profile == "debug" else "--export-release",
             "Redot Rust Compat",
             str(output),
@@ -244,6 +256,7 @@ def export_fixture(
             "Dummy",
             "--path",
             "<PROJECT_ROOT>",
+            "--quit-after", "120",
             "--export-debug" if profile == "debug" else "--export-release",
             "Redot Rust Compat",
             f"<OUTPUT>/{output.name}",
@@ -279,7 +292,8 @@ def export_fixture(
             "size": output.stat().st_size,
         }
     report = {
-        "schema_version": 1,
+        "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
+        "schema_version": 2,
         "status": "PASS" if not failures else "FAIL",
         "target": target_name,
         "profile": profile,
@@ -328,7 +342,10 @@ def run_exported_fixture(
     timeout: int = 120,
     docker_image: str = "rust:1.94-bookworm",
     fixture_type: str = "smoke",
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
 ) -> dict[str, Any]:
+    lock = load_lock(lock_path)
     if fixture_type not in ("smoke", "clean-install"):
         raise ExportError(f"unsupported exported fixture type: {fixture_type}")
     product = product.resolve()
@@ -401,6 +418,13 @@ def run_exported_fixture(
             "--quit-after", "120", "--", "--redot-rust-result=<RESULT>",
         ]
 
+    if command[0] == "docker":
+        version_command = command[:-1] + [f"cp -R /export /tmp/redot-rust-export && chmod +x /tmp/redot-rust-export/{product.name} && /tmp/redot-rust-export/{product.name} --version"]
+        runtime_engine = verify_runtime_version(product, lock, engine_profile_name, target_name, version_command=version_command)
+        command[-1] += " " + shlex.join(fixture_arguments(lock, runtime_engine))
+    else:
+        runtime_engine = verify_runtime_version(executable, lock, engine_profile_name, target_name)
+        command += fixture_arguments(lock, runtime_engine)
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
     findings = scan_text(combined, sanitizer=sanitizer)
@@ -415,11 +439,13 @@ def run_exported_fixture(
         for marker in RUNTIME_MARKERS
         if marker not in combined
     )
+    failures.extend(evaluate_fixture_identity(result, lock, runtime_engine))
     result_marker = RESULT_MARKERS[0 if fixture_type == "smoke" else 1]
     if result_marker not in combined:
         failures.append("exported runtime result marker is missing: " + result_marker)
     report = {
-        "schema_version": 1,
+        "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
+        "schema_version": 2,
         "status": "PASS" if not failures else "FAIL",
         "target": target_name,
         "command": sanitized,
@@ -456,6 +482,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--timeout", type=int, default=120)
     run_parser.add_argument("--fixture-type", choices=("smoke", "clean-install"), default="smoke")
     run_parser.add_argument("--docker-image", default="rust:1.94-bookworm")
+    for subparser in (export_parser, run_parser):
+        subparser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+        subparser.add_argument("--engine-profile")
     args = parser.parse_args(argv)
     try:
         if args.action == "export":
@@ -468,6 +497,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.output_dir,
                 args.report_dir,
                 timeout=args.timeout,
+                lock_path=args.lock, engine_profile_name=args.engine_profile,
                 docker_editor_image=args.docker_editor_image,
             )
         else:
@@ -476,6 +506,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.target,
                 args.report_dir,
                 timeout=args.timeout,
+                lock_path=args.lock, engine_profile_name=args.engine_profile,
                 docker_image=args.docker_image,
                 fixture_type=args.fixture_type,
             )

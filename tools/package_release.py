@@ -305,11 +305,25 @@ def _validate_payload(name: str, data: bytes) -> None:
                 return [text for item in value for text in strings(item)]
             return []
         texts.extend(strings(json.loads(data)))
-    if any(PRIVATE_PATH_PATTERN.search(text) for text in texts + wide_texts) or any(
-        UNICODE_POSIX_ROOT_PATTERN.search(text) for text in texts
-    ):
-        # Do not copy the private value into diagnostics or uploaded reports.
-        raise PackageError(f"private absolute path in {name}")
+    checks = [(PRIVATE_PATH_PATTERN, texts + wide_texts), (UNICODE_POSIX_ROOT_PATTERN, texts)]
+    for pattern, candidates in checks:
+        for text in candidates:
+            match = pattern.search(text)
+            if match:
+                # Do not copy the private value into diagnostics or uploaded reports;
+                # name only the kind of root that matched.
+                raise PackageError(f"private absolute path in {name} ({_root_kind(match.group())})")
+
+
+def _root_kind(matched: str) -> str:
+    if matched.startswith("\\\\"):
+        return "UNC path"
+    if re.match(r"[A-Za-z]:", matched):
+        return "drive path"
+    known = re.match(r"/(?:[a-z]/)?[A-Za-z_]+(?:/[A-Za-z_-]+)?/?", matched)
+    if known and matched.isascii():
+        return f"{known.group()} root"
+    return "non-ASCII POSIX root"
 
 
 def create_package(

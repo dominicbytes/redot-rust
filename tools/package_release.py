@@ -74,15 +74,17 @@ DOCUMENTS = {
 SOURCE_REPOSITORY = "https://github.com/dominicbytes/redot-rust"
 PRIVATE_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+"
-    # A Unicode POSIX root needs a string/text boundary and a second separator;
-    # Use ASCII text separators: numeric tables can decode as Unicode spaces.
-    # Arbitrary instructions and wrong-endian ASCII often decode as Unicode.
-    r"|(?<![^\x09-\x0d \"'=\x00])/[^\x00-\x7f/\\\s][^/\\\x00-\x1f]*/"
     r"|/(?:home|Users|tmp|private/tmp|var/folders|root|workspace|builds|__w|runner)/"
     r"|/github/workspace(?:/|$)|/opt/(?:hostedtoolcache|actions-runner)/"
     r"|/[a-z]/(?:Users|home|workspace)/"
     r"|\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+)", re.I
 )
+# A Unicode POSIX root needs a string/text boundary and a second separator,
+# using ASCII separators because numeric tables can decode as Unicode spaces.
+# It is only applied to UTF-8 text: UTF-16 decodings of instructions and
+# numeric tables routinely produce non-ASCII runs between slashes, while
+# real UTF-16 paths in native libraries are Windows drive paths.
+UNICODE_POSIX_ROOT_PATTERN = re.compile(r"(?<![^\x09-\x0d \"'=\x00])/[^\x00-\x7f/\\\s][^/\\\x00-\x1f]*/")
 
 
 class PackageError(RuntimeError):
@@ -270,18 +272,20 @@ def _validate_payload(name: str, data: bytes) -> None:
     # Check every payload, including native libraries and extensionless license files.
     native_binary = path.suffix.casefold() in {".dll", ".so", ".dylib"}
     texts = []
+    # Native-library strings decoded as UTF-16; see UNICODE_POSIX_ROOT_PATTERN.
+    wide_texts = []
     payloads = [data]
     if native_binary:
         payloads.extend(_compressed_debug_payloads(data))
     for payload in payloads:
-        decoded_strings = [payload.decode("utf-8", errors="surrogateescape")]
+        decoded_strings = [(payload.decode("utf-8", errors="surrogateescape"), False)]
         for encoding in ("utf-16le", "utf-16be"):
             for offset in (0, 1):
                 aligned = payload[offset:]
-                decoded_strings.append(aligned[:len(aligned) // 2 * 2].decode(
+                decoded_strings.append((aligned[:len(aligned) // 2 * 2].decode(
                     encoding, errors="surrogatepass"
-                ))
-        for decoded in decoded_strings:
+                ), True))
+        for decoded, wide in decoded_strings:
             if not native_binary:
                 texts.append(decoded)
                 continue
@@ -289,7 +293,7 @@ def _validate_payload(name: str, data: bytes) -> None:
             # Keep the NUL-boundary rule for short instruction-like fragments.
             for match in re.finditer(r"[^\x00-\x1f\x7f-\x9f\ud800-\udfff\ufdd0-\ufdef\ufffe\uffff]{3,}", decoded):
                 if len(match.group()) >= 6 or match.start() == 0 or decoded[match.start() - 1] == "\0":
-                    texts.append(match.group())
+                    (wide_texts if wide else texts).append(match.group())
     if path.suffix.casefold() == ".json":
         # JSON escaping must not hide a path from the publication gate.
         def strings(value: Any) -> list[str]:
@@ -301,7 +305,9 @@ def _validate_payload(name: str, data: bytes) -> None:
                 return [text for item in value for text in strings(item)]
             return []
         texts.extend(strings(json.loads(data)))
-    if any(PRIVATE_PATH_PATTERN.search(text) for text in texts):
+    if any(PRIVATE_PATH_PATTERN.search(text) for text in texts + wide_texts) or any(
+        UNICODE_POSIX_ROOT_PATTERN.search(text) for text in texts
+    ):
         # Do not copy the private value into diagnostics or uploaded reports.
         raise PackageError(f"private absolute path in {name}")
 

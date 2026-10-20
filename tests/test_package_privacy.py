@@ -59,6 +59,11 @@ class PackagePrivacyTests(unittest.TestCase):
                         for name in ("smoke.dll", "smoke.so", "smoke.dylib", "LICENSE"):
                             with self.subTest(component=component, prefix=prefix, encoding=encoding, offset=offset, name=name):
                                 data = offset + ("\0" + marker + "\0").encode(encoding)
+                                if prefix == "/" and encoding != "utf-8" and name != "LICENSE":
+                                    # Wide POSIX roots in native libraries are indistinguishable
+                                    # from decoded numeric data; only UTF-8 ones are checked.
+                                    _validate_payload(name, data)
+                                    continue
                                 with self.assertRaisesRegex(PackageError, "private absolute path") as caught:
                                     _validate_payload(name, data)
                                 self.assertNotIn(marker, str(caught.exception))

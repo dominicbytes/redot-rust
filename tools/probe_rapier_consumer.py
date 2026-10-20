@@ -15,11 +15,14 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.redot_api import sha256_file  # noqa: E402
+from tools.run_fixture import RUNTIME_SUCCESS_EXIT, evaluate_result  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer  # noqa: E402
 
 
 GODOT_PACKAGES = {
@@ -85,29 +88,45 @@ def payload_hash(root: Path) -> tuple[str, int]:
     return digest.hexdigest().upper(), len(candidates)
 
 
-def inspect_gdext_lock(lock_path: Path, revision: str, version: str) -> dict[str, Any]:
+def inspect_gdext_lock(
+    lock_path: Path, revision: str, version: str,
+    repository: str = "https://github.com/godot-rust/gdext",
+) -> dict[str, Any]:
     cargo_lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
-    observed: dict[str, dict[str, str]] = {}
+    expected_source = urlsplit(repository)
+    observed: dict[str, list[dict[str, str]]] = {}
     failures: list[str] = []
     for package in cargo_lock.get("package", []):
         name = package.get("name")
         if name not in GODOT_PACKAGES:
             continue
-        source = package.get("source", "")
-        if "github.com/godot-rust/gdext" not in source:
-            continue
-        observed[name] = {
-            "version": package.get("version", ""),
-            "source": source,
-        }
+        observed.setdefault(name, []).append({
+            "version": package.get("version", ""), "source": package.get("source", ""),
+        })
     missing = sorted(GODOT_PACKAGES - observed.keys())
     if missing:
         failures.append(f"gdext packages are missing: {', '.join(missing)}")
-    for name, package in sorted(observed.items()):
-        if package["version"] != version:
-            failures.append(f"{name} version is {package['version']}, expected {version}")
-        if not package["source"].endswith(f"#{revision}"):
-            failures.append(f"{name} does not resolve revision {revision}")
+    for name, occurrences in sorted(observed.items()):
+        if len(occurrences) != 1:
+            failures.append(f"{name} has {len(occurrences)} occurrences; expected exactly one")
+        for package in occurrences:
+            if package["version"] != version:
+                failures.append(f"{name} version is {package['version']}, expected {version}")
+            source = package["source"]
+            try:
+                parsed = urlsplit(source.removeprefix("git+"))
+            except ValueError:
+                failures.append(f"{name} source URL is invalid")
+                continue
+            if (
+                not source.startswith("git+")
+                or (parsed.scheme, parsed.netloc, parsed.path) != (
+                    expected_source.scheme, expected_source.netloc, expected_source.path
+                )
+                or parse_qs(parsed.query, keep_blank_values=True) != {"rev": [revision]}
+                or parsed.fragment != revision
+            ):
+                failures.append(f"{name} source does not match the pinned gdext repository and revision")
     return {"packages": observed, "failures": failures}
 
 
@@ -123,23 +142,31 @@ def inspect_exports(dumpbin: Path, library: Path) -> dict[str, Any]:
     }
 
 
-def inspect_runtime(report_path: Path, expected_sha: str) -> dict[str, Any]:
+def inspect_runtime(report_path: Path, expected_sha: str, expected_dimension: str = "2d") -> dict[str, Any]:
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    result = report.get("result") or {}
-    assertions = result.get("assertions") or {}
-    failures: list[str] = []
+    if not isinstance(report, dict):
+        report = {}
+    result = report.get("result")
+    failures = evaluate_result(result, "consumer", expected_dimension=expected_dimension)
+    result = result if isinstance(result, dict) else {}
+    assertions = result.get("assertions")
+    assertions = assertions if isinstance(assertions, dict) else {}
+    if type(report.get("schema_version")) is not int or report.get("schema_version") != 1:
+        failures.append("unsupported or missing consumer runtime report schema")
+    if report.get("returncode") != RUNTIME_SUCCESS_EXIT or report.get("timed_out") is not False:
+        failures.append("runtime report does not prove fixture completion")
     if report.get("status") != "PASS":
         failures.append(f"runtime status is {report.get('status')!r}")
-    if report.get("failures"):
+    if report.get("failures") != []:
         failures.append("runtime report contains failures")
-    if report.get("findings"):
+    if report.get("findings") != []:
         failures.append("runtime report contains blocking findings")
-    if report.get("selection", {}).get("library_sha256") != expected_sha:
+    selection = report.get("selection")
+    if not isinstance(selection, dict) or selection.get("library_sha256") != expected_sha:
         failures.append("runtime library hash does not match inspected DLL")
-    for name, passed in assertions.items():
-        if passed is not True:
-            failures.append(f"runtime assertion failed: {name}")
-    return {
+    initialization = report.get("initialization")
+    initialization = initialization if isinstance(initialization, dict) else {}
+    return EvidenceSanitizer().data({
         "status": report.get("status"),
         "frames": result.get("frames"),
         "assertions_passed": sum(value is True for value in assertions.values()),
@@ -147,11 +174,11 @@ def inspect_runtime(report_path: Path, expected_sha: str) -> dict[str, Any]:
         "active_server_class": result.get("active_server_class"),
         "peak_active_objects": result.get("peak_active_objects"),
         "body_position_y": result.get("body_position_y"),
-        "allowed_findings": report.get("initialization", {}).get(
+        "allowed_findings": initialization.get(
             "allowed_findings", []
         ),
         "failures": failures,
-    }
+    })
 
 
 def probe_consumer(
@@ -191,7 +218,8 @@ def probe_consumer(
         failures.append("generated consumer Rust payload differs from the pinned source")
 
     graph = inspect_gdext_lock(
-        consumer_tree / "Cargo.lock", gdext_revision, gdext_version
+        consumer_tree / "Cargo.lock", gdext_revision, gdext_version,
+        redot["gdext"]["repository"],
     )
     failures.extend(graph["failures"])
     binaries = {
@@ -206,10 +234,10 @@ def probe_consumer(
 
     runtimes = {
         "debug": inspect_runtime(
-            debug_runtime_report, binaries["debug"]["sha256"]
+            debug_runtime_report, binaries["debug"]["sha256"], inputs["dimension"]
         ),
         "release": inspect_runtime(
-            release_runtime_report, binaries["release"]["sha256"]
+            release_runtime_report, binaries["release"]["sha256"], inputs["dimension"]
         ),
     }
     for profile, runtime in runtimes.items():
@@ -253,9 +281,8 @@ def probe_consumer(
 
 def write_report(report: dict[str, Any], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "consumer-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    sanitizer = EvidenceSanitizer()
+    report.update(sanitizer.data(report))
     lines = [
         "# Rapier consumer proof",
         "",
@@ -276,9 +303,8 @@ def write_report(report: dict[str, Any], output_dir: Path) -> None:
         lines.append("")
         lines.extend(f"- {failure}" for failure in report["failures"])
         lines.append("")
-    (output_dir / "consumer-report.md").write_text(
-        "\n".join(lines), encoding="utf-8"
-    )
+    sanitizer.write_text(output_dir / "consumer-report.md", "\n".join(lines))
+    report.update(sanitizer.finish(output_dir, "consumer-report.json", report))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -307,8 +333,8 @@ def main(argv: list[str] | None = None) -> int:
             args.dumpbin,
         )
         write_report(report, args.output_dir)
-    except (ConsumerProbeError, KeyError, OSError, tomllib.TOMLDecodeError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+    except (ConsumerProbeError, KeyError, OSError, ValueError) as error:
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

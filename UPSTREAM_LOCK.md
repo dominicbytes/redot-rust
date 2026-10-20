@@ -8,10 +8,12 @@
 | Selected branch | master |
 | Pinned upstream commit | `637cef73172bba23850131acd8583b0c72ebf0c7` |
 | Pinned crate version | `godot` 0.5.5 with `api-custom-json` |
-| Candidate baseline | This repository, version `0.1.0+redot.26.2.1` |
+| Candidate baseline | This repository, version `0.2.0` |
 | License | New code MPL-2.0; godot-rust upstream MPL-2.0 |
 | Rust toolchain | Rust `1.94.0`; rustc commit `4a4ef493e3a1488c6e321570238084b38948f6db`; Windows MSVC, Linux GNU, and Apple arm64/x86-64 targets |
-| Redot target | Redot 26.2 LTS / Godot API 4.5.2 lineage / single precision |
+| Binding ABI | Unchanged Redot 26.2 / Godot API 4.5.2 / single precision |
+| Runtime targets | Exact official Redot 26.2 and 26.3 profiles in schema v2 |
+| Coverage restriction | No Struct, engine-only enum values or engine-only classes |
 | Redot engine commit | `4f5b14abade2239104847d03d8f9056e4467cfcd` |
 | Actual editor SHA-256 | `10DFBEFC273536F0C65903D6429E531C30133820BF0FA842F2D6E6FB81DB1D42` |
 | Console launcher SHA-256 | `5633D02A28A73514084DF6A60FFE01FABDBBB9AC5E28FDFD590ED47277F51989` |
@@ -19,7 +21,7 @@
 | `gdextension_interface.h` SHA-256 | `4CD695E86B92E2BF4E60BBE19CE137FAF41205DA1CF94F29E069AFEC0F7BF320` |
 | Interface JSON | Not exposed by the installed Redot 26.2 build; pinned gdext bundled interface is the supported path |
 | Quick-start generated artifacts | `build/api/` (not distributed) |
-| Machine lock | `redot-api.lock.json` |
+| Identity lock | `redot-api.lock.json` |
 | Patch queue | Empty; JSON mode starts with unmodified gdext |
 | Rapier consumer | Godot Rapier Physics `0.8.40`, commit `de3458c23426fe332e491013c4412fe1fb84e778`, unchanged source |
 | macOS builder | `ghcr.io/rust-cross/cargo-zigbuild@sha256:b8364c2c60cdcc9b95c402d17654bff517410926a35678bd89dd924b8158d6ae` |
@@ -27,15 +29,24 @@
 
 ## Official Redot inputs
 
+All six editor archives were downloaded from their official release URLs and hashed. Exact executable members and their measured hashes are in `certified_engines.*.assets`. Template rows below are retained 26.2 provenance, not new candidate export qualification.
+
 | Artifact | SHA-256 |
 |---|---|
 | `Redot_v26.2-stable_windows_win64.zip` | `4644C7591BBE8019B861DEB0CCDB64FD4F59A88514ABF7C788CF176C259855AF` |
 | `Redot_v26.2-stable_linux_x64.zip` | `F474D890806C41AF15513CF5A8600243E241882E11B68DBB95660E3465B5B1E4` |
 | `Redot_v26.2-stable_macos_universal.zip` | `128CB7BCA69B95A3998A84E72B0990A302CE5B1919DFB56CFDC709C2C87925AE` |
+| `Redot_v26.3-stable_windows_win64.zip` | `2C6C7B4E96A88CA44EB413D9A5D43B8468B60A346C2448854C1A0C6BC9BAAB76` |
+| `Redot_v26.3-stable_linux_x64.zip` | `7D5155B80F4262F0A394C5040E539BB330CB63DD147BEDD9172D83EC2EFDBD91` |
+| `Redot_v26.3-stable_macos_universal.zip` | `BF781AE53DFAA4BBC6AADD21EBF2C69DA3681ED85894D3AB2A816F0B03755A34` |
 | `Redot_v26.2-stable_export_templates.tpz` | `FA8C648BD9A9D911DAFFBCC4E1786D0248794571A7E4ED954444197C809079EA` |
 | Extracted `macos.zip` template | `E41458D601C7129D984192FF025CB2D13B54D25835A78ADCEFFE2FD6B43E5ED4` |
 
-## Validated smoke-extension binaries
+The 26.3 raw API hash is `4C709D5920855DFE7294D01B9899D21AEC4E94D3DF9FC46F7AA90AD8FFF5A38E`; its C interface hash is `558C1F54F5E37AFDF259FEC29D6EB72DA83781AFDCE48E51A1783942F9CF9895`. Its exact engine commit is `85e5203945af15755dd2f66cb6fdf7545fd88c0b`. These are audit provenance; the binding hashes above remain unchanged.
+
+## Historical 0.1 smoke-extension binaries
+
+The following artifacts predate 0.2 and do not qualify the current candidate.
 
 | Target/profile | SHA-256 | Size (bytes) |
 |---|---|---:|

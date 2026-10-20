@@ -18,7 +18,7 @@ if __package__ in (None, ""):
 
 from tools.configure_cargo import GDEXT_ENV_KEYS  # noqa: E402
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
-from tools.redot_api import IdentityError, load_lock, sha256_file  # noqa: E402
+from tools.redot_api import IdentityError, binding_abi, load_lock, verify_engine, sha256_file  # noqa: E402
 
 
 EXPECTED_FAILURE = "Only Godot major version 4 is supported"
@@ -53,6 +53,7 @@ def run_probe(
     target_dir: Path,
     report_dir: Path,
     timeout: int,
+    engine_profile_name: str | None = None,
 ) -> dict[str, object]:
     lock_path = lock_path.resolve()
     manifest_path = manifest_path.resolve()
@@ -63,12 +64,8 @@ def run_probe(
 
     lock = load_lock(lock_path)
     resolved = resolve_dump_editor(redot_bin)
-    expected_hash = lock.get("binaries", {}).get("editor", {}).get("sha256")
-    actual_hash = sha256_file(resolved.editor)
-    if actual_hash != expected_hash:
-        raise IdentityError(
-            f"binaries.editor.sha256: expected {expected_hash}, found {actual_hash}"
-        )
+    runtime_engine = verify_engine(resolved.editor, lock, engine_profile_name, timeout=timeout)
+    actual_hash = runtime_engine["binary_sha256"]
     if not cargo_bin.is_file():
         raise IdentityError(f"cargo binary does not exist: {cargo_bin}")
     if not manifest_path.is_file():
@@ -130,7 +127,7 @@ def run_probe(
     )
     (report_dir / "cargo-direct-mode.log").write_text(sanitized, encoding="utf-8")
     status, failures = evaluate_direct_probe(
-        returncode, sanitized, lock["redot"]["version_string"]
+        returncode, sanitized, runtime_engine["version_string"]
     )
     if timed_out:
         failures.append("direct-mode probe timed out")
@@ -144,9 +141,9 @@ def run_probe(
         "returncode": returncode,
         "timed_out": timed_out,
         "expected_failure": EXPECTED_FAILURE,
-        "redot_version": lock["redot"]["version_string"],
+        "redot_version": runtime_engine["version_string"],
         "redot_editor_sha256": actual_hash,
-        "gdext_revision": lock["gdext"]["revision"],
+        "gdext_revision": binding_abi(lock)["gdext"]["revision"],
         "failures": failures,
     }
     (report_dir / "direct-mode-report.json").write_text(
@@ -164,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target-dir", required=True, type=Path)
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--engine-profile")
     args = parser.parse_args(argv)
     try:
         report = run_probe(
@@ -173,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             args.manifest,
             args.target_dir,
             args.report_dir,
-            args.timeout,
+            args.timeout, args.engine_profile,
         )
     except (DumpError, IdentityError, OSError, ValueError) as error:
         print(f"FAIL: {error}", file=sys.stderr)

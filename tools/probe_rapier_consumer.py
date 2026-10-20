@@ -193,7 +193,8 @@ def probe_consumer(
     dumpbin: Path,
 ) -> dict[str, Any]:
     inputs = json.loads(consumer_lock.read_text(encoding="utf-8"))
-    redot = json.loads(redot_lock.read_text(encoding="utf-8"))
+    from tools.redot_api import binding_abi, load_lock
+    redot = binding_abi(load_lock(redot_lock))
     expected_commit = inputs["commit"]
     expected_version = inputs["package_version"]
     gdext_revision = redot["gdext"]["revision"]

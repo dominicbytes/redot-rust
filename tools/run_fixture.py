@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +15,9 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.redot_api import DEFAULT_LOCK, binding_identity, load_lock, verify_engine, sha256_file
+from tools.engine_gate import (run_process, fixture_arguments, evaluate_fixture_identity,
+                               clear_import_caches, evaluate_import_exception)
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
 from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
@@ -65,20 +67,20 @@ def evaluate_initialization(
 
 # Exit zero also signals Redot's frame cap; require the fixture's own quit path.
 RUNTIME_SUCCESS_EXIT = 42
-ASSERTION_SCHEMA_VERSION = 1
+ASSERTION_SCHEMA_VERSION = 2
 SMOKE_ASSERTIONS = frozenset({
     "class_visible", "resource_class_visible", "tool_class_visible", "method",
     "property", "signal", "lifecycle_ready", "identity", "build_profile",
     "init_stages", "enum", "array", "dictionary", "variant",
-    "rust_to_gdscript_callable", "resource_apply", "resource_inspector",
+    "runtime_engine", "rust_to_gdscript_callable", "resource_apply", "resource_inspector",
     "resource_round_trip", "editor_tool", "worker_started", "worker_handoff",
 })
 CLEAN_ASSERTIONS = frozenset({
     "class_visible", "instance", "method", "signal", "identity", "lifecycle",
-    "build_profile",
+    "build_profile", "runtime_engine",
 })
 CONSUMER_ASSERTIONS = frozenset({
-    "project_selects_rapier", "server_class_registered", "factory_class_registered",
+    "runtime_engine", "project_selects_rapier", "server_class_registered", "factory_class_registered",
     "active_server_is_rapier", "body_rid_valid", "body_uses_active_space",
     "server_reported_active_objects", "rigid_body_fell", "rigid_body_resting_on_floor",
 })
@@ -149,28 +151,7 @@ def evaluate_run(
     return failures
 
 
-def _run_process(command: list[str], timeout: int) -> tuple[int, bool, str, str]:
-    try:
-        completed = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
-        return completed.returncode, False, completed.stdout, completed.stderr
-    except subprocess.TimeoutExpired as error:
-        stdout = error.stdout or ""
-        stderr = error.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode("utf-8", errors="replace")
-        return -1, True, stdout, stderr
-
+_run_process = run_process
 
 def run_fixture(
     project_dir: Path,
@@ -180,7 +161,12 @@ def run_fixture(
     quit_after: int = 120,
     timeout: int = 60,
     initialize: bool = True,
+    initialize_only: bool = False,
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
 ) -> dict[str, Any]:
+    if initialize_only and not initialize:
+        raise ValueError("initialize_only requires initialization")
     if quit_after < 2:
         raise ValueError("quit_after must be at least 2")
     project_dir = project_dir.resolve()
@@ -197,9 +183,13 @@ def run_fixture(
     report_dir.mkdir(parents=True, exist_ok=True)
 
     resolved = resolve_dump_editor(redot_bin)
+    lock = load_lock(lock_path)
+    runtime = verify_engine(resolved.editor, lock, engine_profile_name, timeout=timeout)
+    identities = {"binding_abi": binding_identity(lock), "runtime_engine": runtime}
     initialization = None
     initialization_failures: list[str] = []
     if initialize:
+        clear_import_caches(project_dir)
         initialization_command = [
             str(resolved.editor),
             "--headless",
@@ -217,16 +207,21 @@ def run_fixture(
         init_log = init_stdout + (
             "\n" if init_stdout and init_stderr else ""
         ) + init_stderr
+        exception = evaluate_import_exception(init_log, init_code, init_timeout, lock=lock,
+                                              runtime=runtime, project=project_dir,
+                                              markers=EDITOR_MARKERS, context="editor-import",
+                                              command=initialization_command)
         init_findings = scan_text(init_log, sanitizer=sanitizer)
         init_log = sanitizer.text(init_log)
         sanitizer.write_text(report_dir / "redot-editor-init.log", init_log)
         initialization_failures = evaluate_initialization(
-            init_code, init_timeout, init_findings
+            0 if exception else init_code, init_timeout, [] if exception else init_findings
         )
         initialization_failures.extend(
             evaluate_markers(init_log, EDITOR_MARKERS, "editor initialization")
         )
         initialization = {
+            "engine_import_exception": exception,
             "command": [
                 "<REDOT_EDITOR>",
                 "--headless",
@@ -245,6 +240,8 @@ def run_fixture(
         }
         if initialization_failures:
             report = {
+                **identities,
+                "schema_version": 2, "scope": "editor-import",
                 "status": "FAIL",
                 "initialization": initialization,
                 "command": None,
@@ -257,6 +254,14 @@ def run_fixture(
             report = sanitizer.finish(report_dir, "run-report.json", report)
             return report
 
+    if initialize_only:
+        cache_hashes = {name: sha256_file(project_dir / ".godot" / name)
+                        for name in ("extension_list.cfg", "global_script_class_cache.cfg")
+                        if (project_dir / ".godot" / name).is_file()}
+        report = {**identities, "schema_version": 2, "scope": "editor-import", "status": "PASS", "initialization": initialization,
+                  "import_cache_sha256": cache_hashes, "failures": []}
+        return sanitizer.finish(report_dir, "run-report.json", report)
+
     command = [
         str(resolved.editor),
         "--headless",
@@ -267,6 +272,7 @@ def run_fixture(
         "--quit-after",
         str(quit_after),
     ]
+    command += ["--", *fixture_arguments(lock, runtime)]
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
     findings = scan_text(combined, sanitizer=sanitizer)
@@ -282,7 +288,10 @@ def run_fixture(
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
     failures = evaluate_run(returncode, timed_out, result, findings)
     failures.extend(evaluate_markers(combined, RUNTIME_MARKERS, "runtime"))
+    failures.extend(evaluate_fixture_identity(result, lock, runtime))
     report = {
+        **identities,
+        "schema_version": 2, "scope": "editor-and-runtime" if initialize else "runtime-only",
         "status": "PASS" if not failures else "FAIL",
         "initialization": initialization,
         "command": [
@@ -314,6 +323,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quit-after", type=int, default=120)
     parser.add_argument("--timeout", type=int, default=60)
     parser.add_argument("--skip-initialize", action="store_true")
+    parser.add_argument("--initialize-only", action="store_true")
+    parser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--engine-profile")
     args = parser.parse_args(argv)
     try:
         report = run_fixture(
@@ -323,6 +335,8 @@ def main(argv: list[str] | None = None) -> int:
             quit_after=args.quit_after,
             timeout=args.timeout,
             initialize=not args.skip_initialize,
+            initialize_only=args.initialize_only,
+            lock_path=args.lock, engine_profile_name=args.engine_profile,
         )
     except (DumpError, OSError, ValueError) as error:
         print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)

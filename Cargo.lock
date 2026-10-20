@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "redot-rust-smoke"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "godot",
 ]

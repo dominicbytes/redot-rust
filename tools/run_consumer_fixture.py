@@ -17,7 +17,8 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
-from tools.redot_api import sha256_file  # noqa: E402
+from tools.redot_api import DEFAULT_LOCK, binding_identity, load_lock, verify_engine, sha256_file
+from tools.engine_gate import fixture_arguments, evaluate_fixture_identity  # noqa: E402
 from tools.run_fixture import _run_process, evaluate_initialization, evaluate_run  # noqa: E402
 from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
@@ -108,6 +109,8 @@ def run_consumer_fixture(
     *,
     quit_after: int = 180,
     timeout: int = 90,
+    lock_path: Path = DEFAULT_LOCK,
+    engine_profile_name: str | None = None,
 ) -> dict[str, Any]:
     if quit_after < 2:
         raise ValueError("quit_after must be at least 2")
@@ -121,6 +124,8 @@ def run_consumer_fixture(
     })
     report_dir.mkdir(parents=True, exist_ok=True)
     resolved = resolve_dump_editor(redot_bin)
+    lock = load_lock(lock_path)
+    runtime_engine = verify_engine(resolved.editor, lock, engine_profile_name, timeout=timeout)
 
     init_command = [
         str(resolved.editor),
@@ -165,6 +170,7 @@ def run_consumer_fixture(
     if init_failures:
         report = {
             "schema_version": 1,
+            "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
             "status": "FAIL",
             "selection": selection,
             "initialization": initialization,
@@ -191,6 +197,7 @@ def run_consumer_fixture(
         "--quit-after",
         str(quit_after),
     ]
+    command += ["--", *fixture_arguments(lock, runtime_engine)]
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
     findings, allowed_findings = partition_findings(scan_text(combined, sanitizer=sanitizer))
@@ -205,7 +212,9 @@ def run_consumer_fixture(
     failures = evaluate_consumer_result(
         returncode, timed_out, result, findings, combined
     )
+    failures.extend(evaluate_fixture_identity(result, lock, runtime_engine, require_binding=False))
     report = {
+        "binding_abi": binding_identity(lock), "runtime_engine": runtime_engine,
         "schema_version": 1,
         "status": "PASS" if not failures else "FAIL",
         "selection": selection,
@@ -246,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report-dir", required=True, type=Path)
     parser.add_argument("--quit-after", type=int, default=180)
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
+    parser.add_argument("--engine-profile")
     args = parser.parse_args(argv)
     try:
         report = run_consumer_fixture(
@@ -256,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             args.report_dir,
             quit_after=args.quit_after,
             timeout=args.timeout,
+            lock_path=args.lock, engine_profile_name=args.engine_profile,
         )
     except (ConsumerFixtureError, DumpError, OSError, ValueError) as error:
         print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)

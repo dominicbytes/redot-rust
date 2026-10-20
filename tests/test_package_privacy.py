@@ -3,6 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import builtins
+import json
 import shutil
 import struct
 import tempfile
@@ -12,6 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.binary_fixtures import elf_binary, pe_binary
+from tests.test_api_identity import FIXTURE, make_lock
 from tests.test_packaging import minimal_pe
 from tools.package_release import PackageError, _validate_payload, create_package
 
@@ -192,12 +194,16 @@ class PackagePrivacyTests(unittest.TestCase):
                     ("linux-x86_64", "control.so", bytes(elf_binary()) + b"\0" + marker)]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            api = root / "extension_api.json"
+            api.write_bytes(FIXTURE.read_bytes())
+            lock = root / "lock.json"
+            lock.write_text(json.dumps(make_lock(api)))
             for target, name, data in controls:
                 with self.subTest(target=target):
                     binary = root / name
                     binary.write_bytes(data)
                     with self.assertRaisesRegex(PackageError, "private absolute path"):
-                        create_package(repo, target, binary, binary, root / target)
+                        create_package(repo, target, binary, binary, root / target, lock_path=lock, api_path=api)
                     self.assertFalse((root / target).exists())
 
 

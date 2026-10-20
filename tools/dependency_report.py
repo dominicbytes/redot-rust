@@ -170,7 +170,7 @@ def dependency_report(
     lock_path = lock_path.resolve()
     lock = load_lock(lock_path)
     if api_path is None:
-        api_value = lock.get("files", {}).get("extension_api", {}).get("path")
+        api_value = lock["binding_abi"].get("files", {}).get("extension_api", {}).get("path")
         if not isinstance(api_value, str):
             raise DependencyReportError("files.extension_api.path is missing from lock")
         api_path = resolve_locked_path(lock_path, api_value)
@@ -198,8 +198,8 @@ def dependency_report(
         "godot_api": identity["godot_api"],
         "api_sha256": identity["api_sha256"],
     }
-    report["cargo"] = lock["rust"]["cargo_version"]
-    report["gdext_revision"] = lock["gdext"]["revision"]
+    report["cargo"] = lock["binding_abi"]["rust"]["cargo_version"]
+    report["gdext_revision"] = lock["binding_abi"]["gdext"]["revision"]
     return report
 
 

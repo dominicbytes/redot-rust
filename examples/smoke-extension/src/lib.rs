@@ -179,8 +179,8 @@ impl RedotRustSmoke {
     }
 
     #[func]
-    fn compatibility_identity(&self) -> GString {
-        "Redot 26.2 / Godot API 4.5.2 / single".into()
+    fn binding_abi(&self) -> GString {
+        env!("REDOT_RUST_BINDING_ABI").into()
     }
 
     #[func]

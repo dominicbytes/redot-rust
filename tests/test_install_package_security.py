@@ -28,8 +28,12 @@ class InstallerSecurityTests(unittest.TestCase):
     def archive(self, payload=None, *, compression=zipfile.ZIP_STORED):
         if payload is None:
             payload = [(str(ADDON_ROOT / "payload.txt"), b"verified")]
+        lock = json.loads((Path(__file__).parents[1] / "redot-api.lock.json").read_text())
         manifest = {
-            "schema_version": 1,
+            "binding_abi": lock["binding_abi"],
+            "certified_engines": lock["certified_engines"],
+            "coverage": lock["binding_abi"]["coverage"],
+            "schema_version": 2,
             "name": "redot-rust-compat",
             "target": "windows-x86_64",
             "version": "test",
@@ -44,6 +48,31 @@ class InstallerSecurityTests(unittest.TestCase):
                 package.writestr(name, data)
             package.writestr(MANIFEST_NAME, json.dumps(manifest))
         return path
+
+    def test_v1_mixed_and_ambiguous_manifest_identities_are_rejected(self):
+        for mutation, message in ((lambda m: m.update(schema_version=1), "schema"),
+                                  (lambda m: m.update(schema_version=2.0), "schema"),
+                                  (lambda m: m.update(redot={}), "mixed"),
+                                  (lambda m: m.update(coverage={}), "identity")):
+            package = self.archive()
+            with zipfile.ZipFile(package) as archive:
+                payload = {name: archive.read(name) for name in archive.namelist()}
+            manifest = json.loads(payload[MANIFEST_NAME])
+            mutation(manifest)
+            payload[MANIFEST_NAME] = json.dumps(manifest).encode()
+            with zipfile.ZipFile(package, "w") as archive:
+                for name, data in payload.items():
+                    archive.writestr(name, data)
+            self.assert_rejected_without_writes(package, message)
+        package = self.archive()
+        with zipfile.ZipFile(package) as archive:
+            payload = {name: archive.read(name) for name in archive.namelist()}
+        original = payload[MANIFEST_NAME].decode()
+        payload[MANIFEST_NAME] = original.replace('"schema_version": 2', '"schema_version": 1, "schema_version": 2', 1).encode()
+        with zipfile.ZipFile(package, "w") as archive:
+            for name, data in payload.items():
+                archive.writestr(name, data)
+        self.assert_rejected_without_writes(package, "ambiguous")
 
     def assert_rejected_without_writes(self, package, message):
         with self.assertRaisesRegex(InstallError, message):

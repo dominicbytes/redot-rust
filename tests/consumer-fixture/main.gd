@@ -14,6 +14,7 @@ var peak_active_objects := 0
 
 
 func _ready() -> void:
+	assertions["runtime_engine"] = _runtime_matches_profile()
 	print("REDOT_RAPIER_CONSUMER lifecycle=ready")
 	_setup()
 
@@ -77,7 +78,8 @@ func _finish() -> void:
 
 	var result := {
 		"schema_version": 1,
-		"assertion_schema_version": 1,
+		"assertion_schema_version": 2,
+		"runtime_engine": _runtime_engine(),
 		"fixture_type": "consumer",
 		"status": "PASS" if passed else "FAIL",
 		"frames": frames,
@@ -109,3 +111,32 @@ func _finish() -> void:
 		]
 	)
 	get_tree().quit(42 if passed else 2)
+
+
+func _expected_identity(argument_name: String) -> Dictionary:
+	for argument: String in OS.get_cmdline_user_args():
+		var prefix := "--redot-rust-expected-%s=" % argument_name
+		if argument.begins_with(prefix):
+			var value: Variant = JSON.parse_string(argument.trim_prefix(prefix))
+			if value is Dictionary:
+				return value
+	return {}
+
+
+func _runtime_engine() -> Dictionary:
+	return {
+		"redot": Engine.get_version_info(),
+		"godot_api": Engine.get_godot_compatible_version_info(),
+	}
+
+
+func _runtime_matches_profile() -> bool:
+	var expected := _expected_identity("engine")
+	if expected.is_empty():
+		return false
+	var actual := _runtime_engine()
+	for section: String in ["redot", "godot_api"]:
+		for key: String in ["major", "minor", "patch", "status", "build"]:
+			if actual[section].get(key) != expected.get(section, {}).get("version_" + key):
+				return false
+	return actual.redot.get("hash") == expected.get("redot", {}).get("engine_commit")

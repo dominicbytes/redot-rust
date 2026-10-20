@@ -10,12 +10,13 @@ from tools.run_fixture import (
     EXPECTED_ASSERTIONS, RUNTIME_SUCCESS_EXIT, RUNTIME_MARKERS,
     evaluate_run, run_fixture,
 )
+from tools.redot_api import load_lock
 from tools.scan_redot_log import EvidenceSanitizer, scan_evidence, scan_text
 
 
 def result_for(kind):
     return {
-        "assertion_schema_version": 1,
+        "assertion_schema_version": 2,
         "fixture_type": kind.removeprefix("exported-"),
         "status": "PASS", "frames": 2,
         "assertions": dict.fromkeys(EXPECTED_ASSERTIONS[kind], True),
@@ -44,7 +45,7 @@ class RuntimeGateRegressionTests(unittest.TestCase):
                     result = {**valid, "assertions": replacement}
                     self.assertTrue(evaluate_run(42, False, result, [], fixture_type=kind))
             for key, value in (("assertion_schema_version", None),
-                               ("assertion_schema_version", 2), ("frames", None),
+                               ("assertion_schema_version", 1), ("frames", None),
                                ("frames", True), ("fixture_type", "unknown")):
                 with self.subTest(kind=kind, field=key):
                     self.assertTrue(evaluate_run(42, False, {**valid, key: value}, [], fixture_type=kind))
@@ -67,12 +68,13 @@ class RuntimeGateRegressionTests(unittest.TestCase):
             def capped_process(command, timeout):
                 (project / ".results" / "fixture-result.json").write_text(json.dumps(result_for("smoke")))
                 return 0, False, "\n".join(RUNTIME_MARKERS), ""
-            with patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
+            with patch("tools.run_fixture.verify_engine", return_value={"profile": "redot-26.2", "identity": load_lock()["certified_engines"]["redot-26.2"]}), patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
                 "tools.run_fixture._run_process", side_effect=capped_process
             ):
                 report = run_fixture(project, root / "engine", root / "evidence", initialize=False)
             self.assertEqual(report["status"], "FAIL")
             self.assertTrue(any("completion requires" in failure for failure in report["failures"]))
+
 
 
 class EvidencePrivacyTests(unittest.TestCase):
@@ -169,7 +171,7 @@ class EvidencePrivacyTests(unittest.TestCase):
                 encoded = json.dumps(result).replace("file:", r"\u0066ile:")
                 (project / ".results" / "fixture-result.json").write_text(encoded)
                 return 42, False, "\n".join(RUNTIME_MARKERS) + "\nERROR: " + result["detail"], ""
-            with patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
+            with patch("tools.run_fixture.verify_engine", return_value={"profile": "redot-26.2", "identity": load_lock()["certified_engines"]["redot-26.2"]}), patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
                 "tools.run_fixture._run_process", side_effect=process
             ):
                 report = run_fixture(project, root / "engine", root / "evidence", initialize=False)
@@ -223,7 +225,7 @@ class EvidencePrivacyTests(unittest.TestCase):
                 result["detail"] = str(project / "main.gd")
                 (project / ".results" / "fixture-result.json").write_text(json.dumps(result))
                 return 42, False, "\n".join(RUNTIME_MARKERS) + "\nERROR: " + str(project / "main.gd"), ""
-            with patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
+            with patch("tools.run_fixture.verify_engine", return_value={"profile": "redot-26.2", "identity": load_lock()["certified_engines"]["redot-26.2"]}), patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
                 "tools.run_fixture._run_process", side_effect=process
             ):
                 report = run_fixture(project, root / "engine", root / "evidence", initialize=False)

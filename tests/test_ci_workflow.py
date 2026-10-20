@@ -25,6 +25,8 @@ class CiWorkflowTests(unittest.TestCase):
     def test_all_platforms_run_unit_format_lint_and_rust_tests(self) -> None:
         jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
         self.assertTrue(jobs)
+        jobs = [job for job in jobs if "needs: engine-profiles" in job]
+        self.assertEqual(len(jobs), 3)
         for job in jobs:
             for gate in (
                 "-m unittest discover -s tests",
@@ -42,6 +44,39 @@ class CiWorkflowTests(unittest.TestCase):
             version = re.search(r"@[0-9a-f]{40} # v([0-9]+)\.[0-9]+\.[0-9]+$", action)
             self.assertIsNotNone(version)
             self.assertGreaterEqual(int(version.group(1)), 7)
+
+    def test_engine_matrix_and_downloads_are_lock_driven(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('json.dumps(list(lock["certified_engines"]))', text)
+        self.assertEqual(text.count("engine_profile: ${{ fromJSON("), 3)
+        self.assertEqual(text.count("tools/fetch_engine.py --binding"), 3)
+        self.assertEqual(text.count("tools/fetch_engine.py --engine-profile"), 3)
+        self.assertEqual(text.count("--binding --output-dir build/api"), 3)
+        self.assertEqual(text.count("--output-dir build/engine-api"), 3)
+        self.assertEqual(text.count("--skip-initialize --import-report"), 6)
+        self.assertEqual(text.count("${{ matrix.engine_profile }}-evidence"), 3)
+        for version in ("26.2", "26.3"):
+            self.assertNotIn(version, text)
+        self.assertNotIn("releases/download/", text)
+
+    def test_every_engine_lane_fetches_locked_dependencies(self) -> None:
+        jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
+        lanes = [job for job in jobs if "needs: engine-profiles" in job]
+        self.assertEqual(len(lanes), 3)
+        for lane in lanes:
+            with self.subTest(lane=lane.splitlines()[0]):
+                toolchain = lane.split("- name: Install the locked Rust toolchain", 1)[1].split("      - name:", 1)[0]
+                self.assertEqual(toolchain.count("cargo fetch --locked"), 1)
+                self.assertLess(toolchain.index("rustup default"), toolchain.index("cargo fetch --locked"))
+
+    def test_every_binary_audit_enforces_its_lane_target(self) -> None:
+        jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
+        for job, target in zip(jobs[1:], ("windows-x86_64", "linux-x86_64", "macos-universal"), strict=True):
+            commands = [line for line in job.splitlines() if "tools/verify_binary_deps.py " in line]
+            self.assertEqual(len(commands), 2)
+            for command in commands:
+                self.assertIn("--target " + target + " ", command)
+                self.assertIn("${{ matrix.engine_profile }}", command)
 
     @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")
     def test_native_failure_cannot_be_replaced_by_later_success(self) -> None:

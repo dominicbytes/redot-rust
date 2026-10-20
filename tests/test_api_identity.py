@@ -16,40 +16,10 @@ def sha256(path: Path) -> str:
 
 
 def make_lock(api_path: Path) -> dict:
-    return {
-        "schema_version": 1,
-        "redot": {
-            "version_major": 26,
-            "version_minor": 2,
-            "version_patch": 0,
-            "version_status": "stable",
-            "version_build": "official",
-            "precision": "single",
-        },
-        "godot_api": {
-            "version_major": 4,
-            "version_minor": 5,
-            "version_patch": 2,
-            "version_status": "stable",
-            "version_build": "redot.official",
-            "precision": "single",
-            "supported_minor_min": 2,
-            "supported_minor_max": 7,
-        },
-        "target": {
-            "platform": "windows",
-            "architecture": "x86_64",
-            "precision": "single",
-            "build": "editor",
-        },
-        "files": {
-            "extension_api": {
-                "path": str(api_path),
-                "sha256": sha256(api_path),
-            },
-            "gdextension_interface_json": {"available": False},
-        },
-    }
+    lock = json.loads((Path(__file__).parents[1] / "redot-api.lock.json").read_text())
+    lock["binding_abi"]["files"]["extension_api"] = {"path": api_path.name, "sha256": sha256(api_path)}
+    return lock
+
 
 
 class ApiIdentityTests(unittest.TestCase):
@@ -80,7 +50,7 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         del api["header"]
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("header: required standard Godot API header is missing", lock)
 
     def test_api_major_26_fails(self) -> None:
@@ -88,7 +58,7 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         api["header"]["version_major"] = 26
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("header.version_major: expected 4, found 26", lock)
 
     def test_wrong_api_minor_fails(self) -> None:
@@ -96,16 +66,16 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         api["header"]["version_minor"] = 6
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("header.version_minor: lock expects 5, found 6", lock)
 
     def test_unsupported_api_minor_fails(self) -> None:
         lock = make_lock(self.api_path)
-        lock["godot_api"]["version_minor"] = 8
+        lock["binding_abi"]["godot_api"]["version_minor"] = 8
         api = self.load_api()
         api["header"]["version_minor"] = 8
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("header.version_minor: supported range is 2..7, found 8", lock)
 
     def test_precision_mismatch_fails(self) -> None:
@@ -113,7 +83,7 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         api["header"]["precision"] = "double"
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("header.precision: target expects single, found double", lock)
 
     def test_build_metadata_mismatch_fails(self) -> None:
@@ -121,14 +91,14 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         api["header"]["version_build"] = "official"
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error(
             "header.version_build: lock expects redot.official, found official", lock
         )
 
     def test_stale_hash_fails_before_identity_is_accepted(self) -> None:
         lock = make_lock(self.api_path)
-        lock["files"]["extension_api"]["sha256"] = "0" * 64
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = "0" * 64
         self.assert_identity_error("files.extension_api.sha256: lock is stale", lock)
 
     def test_redot_header_mismatch_fails(self) -> None:
@@ -136,7 +106,7 @@ class ApiIdentityTests(unittest.TestCase):
         api = self.load_api()
         api["redot_header"]["version_minor"] = 3
         self.write_api(api)
-        lock["files"]["extension_api"]["sha256"] = sha256(self.api_path)
+        lock["binding_abi"]["files"]["extension_api"]["sha256"] = sha256(self.api_path)
         self.assert_identity_error("redot_header.version_minor: lock expects 2, found 3", lock)
 
 

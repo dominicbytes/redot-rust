@@ -49,7 +49,7 @@ class ResultEvaluatorTests(unittest.TestCase):
 
     def valid_result(self) -> dict:
         return {
-            "assertion_schema_version": 1,
+            "assertion_schema_version": 2,
             "fixture_type": "smoke",
             "status": "PASS",
             "frames": 2,

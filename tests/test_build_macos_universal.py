@@ -2,12 +2,13 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import json
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
 from unittest.mock import patch
 
+from tools.redot_api import load_lock
 from tests.binary_fixtures import fat_binary
 from tools.build_macos_universal import (
     DEFAULT_IMAGE,
@@ -26,7 +27,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_bytes(fat_binary())
             with (
-                patch("tools.build_macos_universal.load_lock"),
+                patch("tools.build_macos_universal.load_lock", return_value=load_lock()),
                 patch("tools.build_macos_universal.inspect_api"),
                 patch("tools.build_macos_universal.subprocess.run") as run,
             ):
@@ -41,6 +42,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
     def test_command_pins_image_toolchain_target_and_read_only_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "redot-api.lock.json").write_bytes((Path(__file__).parents[1] / "redot-api.lock.json").read_bytes())
             api = root / "api" / "extension_api.json"
             output = root / "output"
             command = docker_command(root, api, output, "release")
@@ -55,6 +57,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
     def test_renamed_validated_api_is_the_only_mounted_api(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "redot-api.lock.json").write_bytes((Path(__file__).parents[1] / "redot-api.lock.json").read_bytes())
             api = root / "renamed-locked-api.json"
             api.write_text("locked")
             (root / "extension_api.json").write_text("unchecked sibling")

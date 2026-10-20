@@ -5,6 +5,7 @@ const SETTINGS_PATH := "user://redot_rust_settings.tres"
 const STAGE_SCENE := 1 << 0
 const STAGE_MAIN_LOOP := 1 << 2
 
+var _binding_abi: Dictionary = {}
 var _frames: int = 0
 var _signal_value: int = -1
 var _worker_received: bool = false
@@ -38,11 +39,9 @@ func _run_tests() -> void:
 	_record("property", _smoke.value == 42)
 	_record("signal", _signal_value == 42)
 	_record("lifecycle_ready", _smoke.ready_was_seen())
-	_record(
-		"identity",
-		_smoke.compatibility_identity()
-		== "Redot 26.2 / Godot API 4.5.2 / single"
-	)
+	_binding_abi = JSON.parse_string(str(_smoke.call("binding_abi")))
+	_record("identity", not _binding_abi.is_empty() and _binding_abi == _expected_identity("binding"))
+	_record("runtime_engine", _runtime_matches_profile())
 	var expected_profile := str(
 		ProjectSettings.get_setting("compatibility/expected_library_profile", "debug")
 	)
@@ -153,14 +152,15 @@ func _on_worker_completed(value: int) -> void:
 func _finish() -> void:
 	var passed := _failures.is_empty()
 	var payload := {
-		"assertion_schema_version": 1,
+		"assertion_schema_version": 2,
+		"binding_abi": _binding_abi,
+		"runtime_engine": _runtime_engine(),
 		"fixture_type": "smoke",
 		"status": "PASS" if passed else "FAIL",
 		"frames": _frames,
 		"assertions": _assertions,
 		"failures": _failures,
-		"redot_product": "26.2",
-		"godot_api": "4.5.2",
+
 		"library_profile": str(
 			ProjectSettings.get_setting(
 				"compatibility/expected_library_profile",
@@ -181,3 +181,32 @@ func _finish() -> void:
 	file.close()
 	print("REDOT_RUST_RESULT status=%s frames=%d" % [payload.status, _frames])
 	get_tree().quit(42 if passed else 1)
+
+
+func _expected_identity(argument_name: String) -> Dictionary:
+	for argument: String in OS.get_cmdline_user_args():
+		var prefix := "--redot-rust-expected-%s=" % argument_name
+		if argument.begins_with(prefix):
+			var value: Variant = JSON.parse_string(argument.trim_prefix(prefix))
+			if value is Dictionary:
+				return value
+	return {}
+
+
+func _runtime_engine() -> Dictionary:
+	return {
+		"redot": Engine.get_version_info(),
+		"godot_api": Engine.get_godot_compatible_version_info(),
+	}
+
+
+func _runtime_matches_profile() -> bool:
+	var expected := _expected_identity("engine")
+	if expected.is_empty():
+		return false
+	var actual := _runtime_engine()
+	for section: String in ["redot", "godot_api"]:
+		for key: String in ["major", "minor", "patch", "status", "build"]:
+			if actual[section].get(key) != expected.get(section, {}).get("version_" + key):
+				return false
+	return actual.redot.get("hash") == expected.get("redot", {}).get("engine_commit")

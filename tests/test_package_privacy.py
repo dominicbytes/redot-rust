@@ -65,7 +65,8 @@ class PackagePrivacyTests(unittest.TestCase):
 
     def test_unicode_instruction_fragments_are_not_posix_paths(self) -> None:
         # UTF-16 decoding of ordinary instruction bytes can resemble a root.
-        fragments = ("\u2005/\uffff\uffff\u2043/", "\u2e8e/\u8948\u2444\u4848\u058b\u2e82/\u0548\u1328",
+        fragments = (".\u7400\u37b0\ue000.\u2400/\u8400\u37b0\u3000/\u4e00/\u9400\u37b0\u5000/\u9600/",
+                     "\u2005/\uffff\uffff\u2043/", "\u2e8e/\u8948\u2444\u4848\u058b\u2e82/\u0548\u1328",
                      "/\u7275\u7374\u632f\u3461\u3465\u6634")
         for fragment in fragments:
             for encoding in ("utf-16le", "utf-16be"):

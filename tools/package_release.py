@@ -75,8 +75,9 @@ SOURCE_REPOSITORY = "https://github.com/dominicbytes/redot-rust"
 PRIVATE_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+"
     # A Unicode POSIX root needs a string/text boundary and a second separator;
-    # arbitrary instructions and wrong-endian ASCII often decode as Unicode.
-    r"|(?<![^\s\"'=\x00])/[^\x00-\x7f/\\\s][^/\\\x00-\x1f]*/"
+    # Use ASCII text separators: numeric tables can decode as Unicode spaces.
+    # Arbitrary instructions and wrong-endian ASCII often decode as Unicode.
+    r"|(?<![^\x09-\x0d \"'=\x00])/[^\x00-\x7f/\\\s][^/\\\x00-\x1f]*/"
     r"|/(?:home|Users|tmp|private/tmp|var/folders|root|workspace|builds|__w|runner)/"
     r"|/github/workspace(?:/|$)|/opt/(?:hostedtoolcache|actions-runner)/"
     r"|/[a-z]/(?:Users|home|workspace)/"

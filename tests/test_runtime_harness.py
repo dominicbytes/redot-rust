@@ -1,6 +1,9 @@
 import unittest
 
-from tools.run_fixture import evaluate_initialization, evaluate_markers, evaluate_run
+from tools.run_fixture import (
+    EXPECTED_ASSERTIONS, RUNTIME_SUCCESS_EXIT, evaluate_initialization,
+    evaluate_markers, evaluate_run,
+)
 from tools.scan_redot_log import scan_text
 
 
@@ -46,13 +49,15 @@ class ResultEvaluatorTests(unittest.TestCase):
 
     def valid_result(self) -> dict:
         return {
+            "assertion_schema_version": 1,
+            "fixture_type": "smoke",
             "status": "PASS",
             "frames": 2,
-            "assertions": {"class_visible": True, "method": True, "signal": True},
+            "assertions": dict.fromkeys(EXPECTED_ASSERTIONS["smoke"], True),
         }
 
     def test_complete_result_passes(self) -> None:
-        self.assertEqual(evaluate_run(0, False, self.valid_result(), []), [])
+        self.assertEqual(evaluate_run(RUNTIME_SUCCESS_EXIT, False, self.valid_result(), []), [])
 
     def test_process_failure_timeout_short_run_assertion_and_log_are_all_failures(self) -> None:
         result = self.valid_result()
@@ -62,7 +67,7 @@ class ResultEvaluatorTests(unittest.TestCase):
 
         failures = evaluate_run(7, True, result, findings)
 
-        self.assertIn("process exit code 7", failures)
+        self.assertTrue(any("process exit code 7" in failure for failure in failures))
         self.assertIn("wall-clock timeout", failures)
         self.assertIn("fixture ran 1 frame(s); at least 2 are required", failures)
         self.assertIn("assertion failed: signal", failures)
@@ -70,7 +75,8 @@ class ResultEvaluatorTests(unittest.TestCase):
 
     def test_missing_result_fails(self) -> None:
         self.assertEqual(
-            evaluate_run(0, False, None, []), ["fixture result JSON is missing"]
+            evaluate_run(RUNTIME_SUCCESS_EXIT, False, None, []),
+            ["fixture result JSON is missing or is not an object"]
         )
 
     def test_editor_initialization_is_gated_separately(self) -> None:

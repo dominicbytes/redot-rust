@@ -27,7 +27,7 @@ from tools.run_fixture import (  # noqa: E402
     evaluate_markers,
     evaluate_run,
 )
-from tools.scan_redot_log import scan_text  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
 
 PROFILES = {
@@ -81,6 +81,12 @@ def run_linux_fixture(
     result_path = output_project / ".results" / "fixture-result.json"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({
+        output_project.resolve(): "<PROJECT_ROOT>",
+        source_project.resolve(): "<SOURCE_PROJECT_ROOT>",
+        redot_bin.resolve().parent: "<ENGINE_ROOT>",
+        report_dir: "<EVIDENCE_ROOT>",
+    })
     report_dir.mkdir(parents=True, exist_ok=True)
 
     library = output_project / "bin" / PROFILES[profile]["library"]
@@ -105,6 +111,8 @@ def run_linux_fixture(
     init_command = [
         str(resolved.editor),
         "--headless",
+        "--audio-driver",
+        "Dummy",
         "--editor",
         "--path",
         str(output_project),
@@ -115,8 +123,9 @@ def run_linux_fixture(
         init_command, timeout
     )
     init_log = init_stdout + ("\n" if init_stdout and init_stderr else "") + init_stderr
-    (report_dir / "redot-editor-init.log").write_text(init_log, encoding="utf-8")
-    init_findings = scan_text(init_log)
+    init_findings = scan_text(init_log, sanitizer=sanitizer)
+    init_log = sanitizer.text(init_log)
+    sanitizer.write_text(report_dir / "redot-editor-init.log", init_log)
     init_failures = evaluate_initialization(init_code, init_timeout, init_findings)
     init_failures.extend(
         evaluate_markers(init_log, EDITOR_MARKERS, "editor initialization")
@@ -125,6 +134,8 @@ def run_linux_fixture(
         "command": [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--editor",
             "--path",
             "<PROJECT_ROOT>",
@@ -144,16 +155,14 @@ def run_linux_fixture(
             "runtime": None,
             "failures": init_failures,
         }
-        (report_dir / "run-report.json").write_text(
-            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        report = sanitizer.finish(report_dir, "run-report.json", report)
         return report
 
     template_dir = str(template.resolve().parent)
     script = (
         f"cp /templates/{template.name} /tmp/redot && "
         "chmod +x /tmp/redot && "
-        f"/tmp/redot --headless --path /fixture --quit-after {quit_after}"
+        f"/tmp/redot --headless --audio-driver Dummy --path /fixture --quit-after {quit_after}"
     )
     command = [
         "docker",
@@ -170,14 +179,15 @@ def run_linux_fixture(
     ]
     returncode, timed_out, stdout, stderr = _docker_run(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-runtime.log").write_text(combined, encoding="utf-8")
+    findings = scan_text(combined, sanitizer=sanitizer)
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-runtime.log", combined)
     result = None
     if result_path.is_file():
         try:
             result = json.loads(result_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             result = {"status": "INVALID_JSON", "frames": 0, "assertions": {}}
-    findings = scan_text(combined)
     failures = evaluate_run(returncode, timed_out, result, findings)
     failures.extend(evaluate_markers(combined, RUNTIME_MARKERS, "runtime"))
     runtime = {
@@ -189,6 +199,8 @@ def run_linux_fixture(
             docker_image,
             "<REDOT_TEMPLATE>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             "/fixture",
             "--quit-after",
@@ -207,9 +219,7 @@ def run_linux_fixture(
         "runtime": runtime,
         "failures": failures,
     }
-    (report_dir / "run-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "run-report.json", report)
     return report
 
 
@@ -238,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout=args.timeout,
         )
     except (DumpError, LinuxFixtureError, MaterializeError, OSError, ValueError) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

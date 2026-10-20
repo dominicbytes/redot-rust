@@ -22,7 +22,7 @@ if __package__ in (None, ""):
 from tools.dump_redot_api import DumpError, resolve_dump_editor  # noqa: E402
 from tools.redot_api import sha256_file  # noqa: E402
 from tools.run_fixture import _run_process, evaluate_run  # noqa: E402
-from tools.scan_redot_log import scan_text  # noqa: E402
+from tools.scan_redot_log import EvidenceSanitizer, scan_text  # noqa: E402
 
 
 TARGETS = {
@@ -172,6 +172,12 @@ def export_fixture(
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({
+        project_dir: "<PROJECT_ROOT>",
+        redot_bin.resolve().parent: "<ENGINE_ROOT>",
+        template.resolve().parent: "<TEMPLATE_ROOT>",
+        output_dir.resolve(): "<BUILD_ROOT>", report_dir: "<EVIDENCE_ROOT>",
+    })
     report_dir.mkdir(parents=True, exist_ok=True)
     output = output_dir / _output_name(target_name, profile)
     if docker_editor_image:
@@ -189,7 +195,7 @@ def export_fixture(
         script = (
             f"cp /editor/{redot_bin.name} /tmp/redot && chmod +x /tmp/redot && "
             f"{install_template}"
-            "/tmp/redot --headless --path /project "
+            "/tmp/redot --headless --audio-driver Dummy --path /project "
             f"{'--export-debug' if profile == 'debug' else '--export-release'} "
             f"'Redot Rust Compat' /output/{output.name}"
         )
@@ -223,6 +229,8 @@ def export_fixture(
         command = [
             str(resolved.editor),
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             str(project_dir),
             "--export-debug" if profile == "debug" else "--export-release",
@@ -232,6 +240,8 @@ def export_fixture(
         sanitized_command = [
             "<REDOT_EDITOR>",
             "--headless",
+            "--audio-driver",
+            "Dummy",
             "--path",
             "<PROJECT_ROOT>",
             "--export-debug" if profile == "debug" else "--export-release",
@@ -240,8 +250,9 @@ def export_fixture(
         ]
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-export.log").write_text(combined, encoding="utf-8")
-    all_findings = scan_text(combined)
+    all_findings = scan_text(combined, sanitizer=sanitizer)
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-export.log", combined)
     allowed_findings = []
     findings = []
     for finding in all_findings:
@@ -285,9 +296,7 @@ def export_fixture(
         "product": product,
         "failures": failures,
     }
-    (report_dir / "export-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "export-report.json", report)
     return report
 
 
@@ -318,13 +327,17 @@ def run_exported_fixture(
     *,
     timeout: int = 120,
     docker_image: str = "rust:1.94-bookworm",
+    fixture_type: str = "smoke",
 ) -> dict[str, Any]:
+    if fixture_type not in ("smoke", "clean-install"):
+        raise ExportError(f"unsupported exported fixture type: {fixture_type}")
     product = product.resolve()
     if not product.is_file():
         raise ExportError(f"export product does not exist: {product}")
     if target_name not in TARGETS:
         raise ExportError(f"unsupported target: {target_name}")
     report_dir = report_dir.resolve()
+    sanitizer = EvidenceSanitizer({product.parent: "<BUILD_ROOT>", report_dir: "<EVIDENCE_ROOT>"})
     report_dir.mkdir(parents=True, exist_ok=True)
     result_path = report_dir / "exported-fixture-result.json"
     if result_path.exists():
@@ -336,15 +349,21 @@ def run_exported_fixture(
         command = [
             str(executable),
             "--headless",
+            "--audio-driver",
+            "Dummy",
+            "--quit-after", "120",
             "--",
             f"--redot-rust-result={result_path}",
         ]
-        sanitized = ["<EXPORTED_FIXTURE>", "--headless", "--", "--redot-rust-result=<RESULT>"]
+        sanitized = [
+            "<EXPORTED_FIXTURE>", "--headless", "--audio-driver", "Dummy",
+            "--quit-after", "120", "--", "--redot-rust-result=<RESULT>",
+        ]
     elif target_name == "linux-x86_64":
         script = (
             "cp -R /export /tmp/redot-rust-export && "
             f"chmod +x /tmp/redot-rust-export/{product.name} && "
-            f"/tmp/redot-rust-export/{product.name} --headless -- "
+            f"/tmp/redot-rust-export/{product.name} --headless --audio-driver Dummy --quit-after 120 -- "
             "--redot-rust-result=/results/exported-fixture-result.json"
         )
         command = [
@@ -371,26 +390,34 @@ def run_exported_fixture(
         command = [
             str(executable),
             "--headless",
+            "--audio-driver",
+            "Dummy",
+            "--quit-after", "120",
             "--",
             f"--redot-rust-result={result_path}",
         ]
-        sanitized = ["<EXPORTED_FIXTURE>", "--headless", "--", "--redot-rust-result=<RESULT>"]
+        sanitized = [
+            "<EXPORTED_FIXTURE>", "--headless", "--audio-driver", "Dummy",
+            "--quit-after", "120", "--", "--redot-rust-result=<RESULT>",
+        ]
 
     returncode, timed_out, stdout, stderr = _run_process(command, timeout)
     combined = stdout + ("\n" if stdout and stderr else "") + stderr
-    (report_dir / "redot-exported-runtime.log").write_text(combined, encoding="utf-8")
+    findings = scan_text(combined, sanitizer=sanitizer)
+    combined = sanitizer.text(combined)
+    sanitizer.write_text(report_dir / "redot-exported-runtime.log", combined)
     result = _runtime_result(result_path)
-    findings = scan_text(combined)
-    failures = evaluate_run(returncode, timed_out, result, findings)
+    failures = evaluate_run(
+        returncode, timed_out, result, findings, fixture_type=f"exported-{fixture_type}"
+    )
     failures.extend(
         f"exported runtime marker is missing: {marker}"
         for marker in RUNTIME_MARKERS
         if marker not in combined
     )
-    if not any(marker in combined for marker in RESULT_MARKERS):
-        failures.append(
-            "exported runtime result marker is missing: " + " or ".join(RESULT_MARKERS)
-        )
+    result_marker = RESULT_MARKERS[0 if fixture_type == "smoke" else 1]
+    if result_marker not in combined:
+        failures.append("exported runtime result marker is missing: " + result_marker)
     report = {
         "schema_version": 1,
         "status": "PASS" if not failures else "FAIL",
@@ -405,9 +432,7 @@ def run_exported_fixture(
         },
         "failures": failures,
     }
-    (report_dir / "exported-run-report.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    report = sanitizer.finish(report_dir, "exported-run-report.json", report)
     return report
 
 
@@ -429,6 +454,7 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--target", required=True, choices=sorted(TARGETS))
     run_parser.add_argument("--report-dir", required=True, type=Path)
     run_parser.add_argument("--timeout", type=int, default=120)
+    run_parser.add_argument("--fixture-type", choices=("smoke", "clean-install"), default="smoke")
     run_parser.add_argument("--docker-image", default="rust:1.94-bookworm")
     args = parser.parse_args(argv)
     try:
@@ -451,9 +477,10 @@ def main(argv: list[str] | None = None) -> int:
                 args.report_dir,
                 timeout=args.timeout,
                 docker_image=args.docker_image,
+                fixture_type=args.fixture_type,
             )
     except (DumpError, ExportError, OSError, ValueError, zipfile.BadZipFile) as error:
-        print(f"FAIL: {error}", file=sys.stderr)
+        print(EvidenceSanitizer().text(f"FAIL: {error}"), file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 2

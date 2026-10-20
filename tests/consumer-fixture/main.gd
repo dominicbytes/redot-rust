@@ -77,8 +77,11 @@ func _finish() -> void:
 
 	var result := {
 		"schema_version": 1,
+		"assertion_schema_version": 1,
+		"fixture_type": "consumer",
 		"status": "PASS" if passed else "FAIL",
 		"frames": frames,
+		"dimension": "2d",
 		"assertions": assertions,
 		"active_server_class": PhysicsServer2D.get_class(),
 		"active_objects": active_objects,
@@ -105,4 +108,4 @@ func _finish() -> void:
 			result.body_position_y,
 		]
 	)
-	get_tree().quit(0 if passed else 2)
+	get_tree().quit(42 if passed else 2)

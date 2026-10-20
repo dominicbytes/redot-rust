@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.run_fixture import EXPECTED_ASSERTIONS, RUNTIME_SUCCESS_EXIT
 from tools.run_consumer_fixture import (
     ENGINE_MARKER,
     RESULT_MARKER,
@@ -51,13 +52,17 @@ class ConsumerFixtureTests(unittest.TestCase):
 
     def test_evaluate_accepts_complete_pass(self) -> None:
         result = {
+            "assertion_schema_version": 1,
+            "fixture_type": "consumer",
+            "dimension": "2d",
+            "active_server_class": "RapierPhysicsServer2D",
             "status": "PASS",
             "frames": 90,
-            "assertions": {"server": True, "physics": True},
+            "assertions": dict.fromkeys(EXPECTED_ASSERTIONS["consumer"], True),
         }
         log = f"{ENGINE_MARKER}\n{RESULT_MARKER}\n"
 
-        self.assertEqual(evaluate_consumer_result(0, False, result, [], log), [])
+        self.assertEqual(evaluate_consumer_result(RUNTIME_SUCCESS_EXIT, False, result, [], log), [])
 
     def test_evaluate_rejects_failed_assertion_and_markers(self) -> None:
         result = {
@@ -68,7 +73,7 @@ class ConsumerFixtureTests(unittest.TestCase):
 
         failures = evaluate_consumer_result(2, False, result, [], "")
 
-        self.assertIn("process exit code 2", failures)
+        self.assertTrue(any("process exit code 2" in failure for failure in failures))
         self.assertIn("assertion failed: physics", failures)
         self.assertTrue(
             any("runtime marker is missing" in failure for failure in failures)

@@ -193,7 +193,8 @@ def _elf_details(data: bytes) -> dict[str, Any]:
             raise BinaryAuditError("ELF dynamic strings exceed load-segment bounds")
         dependencies = [
             _cstring(strings, value)
-            for tag in (1, 0x7FFFFFFD, 0x7FFFFFFF)  # NEEDED, AUXILIARY, FILTER
+            # NEEDED, AUXILIARY, FILTER, DEPAUDIT, AUDIT
+            for tag in (1, 0x7FFFFFFD, 0x7FFFFFFF, 0x6FFFFEFB, 0x6FFFFEFC)
             for value in tags.get(tag, [])
         ]
         search_paths = [

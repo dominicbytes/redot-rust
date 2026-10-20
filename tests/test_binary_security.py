@@ -170,8 +170,8 @@ class BinarySecurityTests(unittest.TestCase):
         struct.pack_into("<H", elf, 56, 1)
         self.assert_failed(elf, "incomplete", "linux-x86_64")
 
-    def test_elf_filter_and_auxiliary_dependencies_are_audited(self):
-        for tag in (0x7FFFFFFD, 0x7FFFFFFF):
+    def test_elf_filter_auxiliary_and_audit_dependencies_are_audited(self):
+        for tag in (0x7FFFFFFD, 0x7FFFFFFF, 0x6FFFFEFB, 0x6FFFFEFC):
             data = elf_binary("libmissing_control.so")
             struct.pack_into("<q", data, 0x200, tag)
             self.assert_failed(data, "not bundled", "linux-x86_64")

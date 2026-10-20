@@ -5,10 +5,10 @@
 import json
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
 from unittest.mock import patch
 
+from tools.redot_api import load_lock
 from tests.binary_fixtures import fat_binary
 from tools.build_macos_universal import (
     DEFAULT_IMAGE,
@@ -27,7 +27,7 @@ class BuildMacosUniversalTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_bytes(fat_binary())
             with (
-                patch("tools.build_macos_universal.load_lock"),
+                patch("tools.build_macos_universal.load_lock", return_value=load_lock()),
                 patch("tools.build_macos_universal.inspect_api"),
                 patch("tools.build_macos_universal.subprocess.run") as run,
             ):

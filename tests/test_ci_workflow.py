@@ -59,6 +59,15 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertNotIn(version, text)
         self.assertNotIn("releases/download/", text)
 
+    def test_every_binary_audit_enforces_its_lane_target(self) -> None:
+        jobs = re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", WORKFLOW.read_text(encoding="utf-8").split("jobs:\n")[1])[1:]
+        for job, target in zip(jobs[1:], ("windows-x86_64", "linux-x86_64", "macos-universal"), strict=True):
+            commands = [line for line in job.splitlines() if "tools/verify_binary_deps.py " in line]
+            self.assertEqual(len(commands), 2)
+            for command in commands:
+                self.assertIn("--target " + target + " ", command)
+                self.assertIn("${{ matrix.engine_profile }}", command)
+
     @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is not installed")
     def test_native_failure_cannot_be_replaced_by_later_success(self) -> None:
         # Match GitHub's built-in pwsh wrapper around the workflow's preference.

@@ -171,7 +171,7 @@ class EvidencePrivacyTests(unittest.TestCase):
                 encoded = json.dumps(result).replace("file:", r"\u0066ile:")
                 (project / ".results" / "fixture-result.json").write_text(encoded)
                 return 42, False, "\n".join(RUNTIME_MARKERS) + "\nERROR: " + result["detail"], ""
-            with patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
+            with patch("tools.run_fixture.verify_engine", return_value={"profile": "redot-26.2", "identity": load_lock()["certified_engines"]["redot-26.2"]}), patch("tools.run_fixture.resolve_dump_editor", return_value=SimpleNamespace(editor=root / "engine")), patch(
                 "tools.run_fixture._run_process", side_effect=process
             ):
                 report = run_fixture(project, root / "engine", root / "evidence", initialize=False)

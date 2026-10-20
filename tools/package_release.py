@@ -72,12 +72,22 @@ DOCUMENTS = {
 }
 
 SOURCE_REPOSITORY = "https://github.com/dominicbytes/redot-rust"
-PRIVATE_PATH_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+"
-    r"|/(?:home|Users|tmp|private/tmp|var/folders|root|workspace|builds|__w|runner)/"
+POSIX_ROOTS = (
+    r"/(?:home|Users|tmp|private/tmp|var/folders|root|workspace|builds|__w|runner)/"
     r"|/github/workspace(?:/|$)|/opt/(?:hostedtoolcache|actions-runner)/"
     r"|/[a-z]/(?:Users|home|workspace)/"
+)
+PRIVATE_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+|" + POSIX_ROOTS +
     r"|\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+)", re.I
+)
+# Native libraries contain short printable fragments by chance, such as a
+# bare `A:\` between NUL bytes in a large debug library. A leaked path always
+# names something below its root, so require a path character after a drive
+# root and a further separator after a UNC share.
+BINARY_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]+[^\x00-\x1f\\/:*?\"<>|]|" + POSIX_ROOTS +
+    r"|\\\\[A-Za-z0-9_.-]+\\[A-Za-z0-9_$.-]+\\)", re.I
 )
 # A Unicode POSIX root needs a string/text boundary and a second separator,
 # using ASCII separators because numeric tables can decode as Unicode spaces.
@@ -272,7 +282,9 @@ def _validate_payload(name: str, data: bytes) -> None:
     # Check every payload, including native libraries and extensionless license files.
     native_binary = path.suffix.casefold() in {".dll", ".so", ".dylib"}
     texts = []
-    # Native-library strings decoded as UTF-16; see UNICODE_POSIX_ROOT_PATTERN.
+    # Native-library strings decoded as UTF-8 and as UTF-16; see
+    # BINARY_PATH_PATTERN and UNICODE_POSIX_ROOT_PATTERN.
+    native_texts = []
     wide_texts = []
     payloads = [data]
     if native_binary:
@@ -293,7 +305,7 @@ def _validate_payload(name: str, data: bytes) -> None:
             # Keep the NUL-boundary rule for short instruction-like fragments.
             for match in re.finditer(r"[^\x00-\x1f\x7f-\x9f\ud800-\udfff\ufdd0-\ufdef\ufffe\uffff]{3,}", decoded):
                 if len(match.group()) >= 6 or match.start() == 0 or decoded[match.start() - 1] == "\0":
-                    (wide_texts if wide else texts).append(match.group())
+                    (wide_texts if wide else native_texts).append(match.group())
     if path.suffix.casefold() == ".json":
         # JSON escaping must not hide a path from the publication gate.
         def strings(value: Any) -> list[str]:
@@ -305,7 +317,11 @@ def _validate_payload(name: str, data: bytes) -> None:
                 return [text for item in value for text in strings(item)]
             return []
         texts.extend(strings(json.loads(data)))
-    checks = [(PRIVATE_PATH_PATTERN, texts + wide_texts), (UNICODE_POSIX_ROOT_PATTERN, texts)]
+    checks = [
+        (PRIVATE_PATH_PATTERN, texts),
+        (BINARY_PATH_PATTERN, native_texts + wide_texts),
+        (UNICODE_POSIX_ROOT_PATTERN, texts + native_texts),
+    ]
     for pattern, candidates in checks:
         for text in candidates:
             match = pattern.search(text)

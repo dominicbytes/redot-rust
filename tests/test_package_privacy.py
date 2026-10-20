@@ -77,12 +77,22 @@ class PackagePrivacyTests(unittest.TestCase):
             for encoding in ("utf-16le", "utf-16be"):
                 _validate_payload("smoke.dll", ("\0" + fragment + "\0").encode(encoding))
 
-    def test_drive_root_does_not_require_a_directory_character(self) -> None:
-        for marker in ("q:/", "Q:\\", "q:/\u4e2d"):
+    def test_drive_root_does_not_require_an_ascii_directory_character(self) -> None:
+        for marker in ("q:/\u4e2d", "Q:\\\u00e9", "q:/x"):
             for encoding in ("utf-8", "utf-16le", "utf-16be"):
                 with self.subTest(marker=marker, encoding=encoding):
                     with self.assertRaisesRegex(PackageError, "private absolute path"):
                         _validate_payload("smoke.dll", ("\0" + marker + "\0").encode(encoding))
+
+    def test_bare_roots_in_libraries_are_chance_fragments(self) -> None:
+        # Large debug libraries contain NUL-delimited fragments such as `A:\`
+        # by chance; text payloads still reject a bare root.
+        for marker in ("A:\\", "z:\\", "Y:/", ",P:\\", "\\\\ab\\cd"):
+            for name in ("smoke.dll", "smoke.so", "smoke.dylib"):
+                with self.subTest(marker=marker, name=name):
+                    _validate_payload(name, ("\0" + marker + "\0").encode())
+            with self.assertRaisesRegex(PackageError, "private absolute path"):
+                _validate_payload("LICENSE", marker.encode())
 
     def test_elf_zlib_and_legacy_sections_are_scanned(self) -> None:
         for marker in (b"Q:/fictional/private/source.rs\0", "q:/\u4e2d\u6587/private/source.rs\0".encode()):
